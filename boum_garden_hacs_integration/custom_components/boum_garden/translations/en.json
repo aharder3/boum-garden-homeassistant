@@ -1,0 +1,66 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Boum Garden",
+        "description": "Connect Home Assistant to the Boum IoT REST API.",
+        "data": {
+          "email": "Email",
+          "password": "Password",
+          "env": "API environment",
+          "scan_interval": "Scan interval in seconds",
+          "base_url_override": "Custom API base URL (optional)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Boum Garden",
+        "description": "Enter the password for {email}.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the Boum API.",
+      "invalid_auth": "Invalid Boum credentials.",
+      "unknown": "Unexpected error. Check the Home Assistant log."
+    },
+    "abort": {
+      "already_configured": "This Boum account is already configured.",
+      "reauth_successful": "Reauthentication was successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Boum Garden options",
+        "data": {
+          "scan_interval": "Scan interval in seconds"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "device_status": {"name": "Status"},
+      "battery": {"name": "Battery"},
+      "temperature": {"name": "Temperature"},
+      "humidity": {"name": "Humidity"},
+      "moisture": {"name": "Moisture"},
+      "water_level": {"name": "Water level"},
+      "flow_rate": {"name": "Flow rate"},
+      "rssi": {"name": "RSSI"},
+      "last_seen": {"name": "Last seen"},
+      "last_pumped": {"name": "Last pumped"},
+      "pump_state": {"name": "Pump state"}
+    },
+    "switch": {
+      "pump": {"name": "Pump"}
+    },
+    "button": {
+      "refresh": {"name": "Refresh"},
+      "restart_device": {"name": "Restart device"},
+      "reset_last_pumped": {"name": "Reset last pumped"}
+    }
+  }
+}
