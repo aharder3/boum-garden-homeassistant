@@ -40,7 +40,22 @@ class BoumValueSensorDescription(SensorEntityDescription):
 
     keys: tuple[str, ...]
     value_type: str = "auto"
+    source_order: tuple[str, ...] = ("reported", "telemetry", "desired")
 
+
+PUMP_STATE_KEYS = ("pumpState", "pump_state")
+LAST_WATERING_KEYS = (
+    "lastPumped",
+    "lastPump",
+    "lastPumpedAt",
+    "lastWatered",
+    "lastWateredAt",
+    "lastIrrigated",
+    "lastIrrigatedAt",
+    "lastRefill",
+    "lastRefilled",
+    "lastRefilledAt",
+)
 
 SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
     BoumValueSensorDescription(
@@ -120,17 +135,43 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
     BoumValueSensorDescription(
         key="last_pumped",
         translation_key="last_pumped",
-        keys=("lastPumped", "lastPump", "lastPumpedAt"),
+        keys=LAST_WATERING_KEYS,
         device_class=SensorDeviceClass.TIMESTAMP,
         value_type="timestamp",
         icon="mdi:pump",
     ),
     BoumValueSensorDescription(
+        key="last_pumped_raw",
+        translation_key="last_pumped_raw",
+        keys=LAST_WATERING_KEYS,
+        value_type="string",
+        icon="mdi:pump-outline",
+    ),
+    BoumValueSensorDescription(
         key="pump_state",
         translation_key="pump_state",
-        keys=("pumpState", "pump_state"),
+        keys=PUMP_STATE_KEYS,
         value_type="string",
         icon="mdi:water-pump",
+        # This is the UI/control state. Prefer desired, because Boum devices may
+        # report physical state later.
+        source_order=("desired", "reported", "telemetry"),
+    ),
+    BoumValueSensorDescription(
+        key="pump_state_reported",
+        translation_key="pump_state_reported",
+        keys=PUMP_STATE_KEYS,
+        value_type="string",
+        icon="mdi:water-pump-off",
+        source_order=("reported",),
+    ),
+    BoumValueSensorDescription(
+        key="pump_state_desired",
+        translation_key="pump_state_desired",
+        keys=PUMP_STATE_KEYS,
+        value_type="string",
+        icon="mdi:water-pump",
+        source_order=("desired",),
     ),
     BoumValueSensorDescription(
         key="online",
@@ -166,6 +207,7 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
         keys=("leakageDetection", "leakage_detection", "leakDetected", "leak"),
         value_type="boolean_text",
         icon="mdi:water-alert",
+        source_order=("desired", "reported", "telemetry"),
     ),
     BoumValueSensorDescription(
         key="min_flow_rate",
@@ -175,6 +217,7 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_type="float",
         icon="mdi:waves-arrow-right",
+        source_order=("desired", "reported", "telemetry"),
     ),
     BoumValueSensorDescription(
         key="max_pump_duration",
@@ -182,6 +225,7 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
         keys=("maxPumpDuration", "max_pump_duration"),
         value_type="string",
         icon="mdi:timer-sand",
+        source_order=("desired", "reported", "telemetry"),
     ),
     BoumValueSensorDescription(
         key="refill_interval",
@@ -189,6 +233,7 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
         keys=("refillInterval", "refill_interval"),
         value_type="string",
         icon="mdi:calendar-clock",
+        source_order=("desired", "reported", "telemetry"),
     ),
     BoumValueSensorDescription(
         key="max_pub_interval",
@@ -196,6 +241,7 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
         keys=("maxPubInterval", "max_pub_interval"),
         value_type="string",
         icon="mdi:timer-cog-outline",
+        source_order=("desired", "reported", "telemetry"),
     ),
     BoumValueSensorDescription(
         key="high_battery_max_pub_interval",
@@ -203,6 +249,7 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
         keys=("hMaxPubInterval", "h_max_pub_interval"),
         value_type="string",
         icon="mdi:timer-cog",
+        source_order=("desired", "reported", "telemetry"),
     ),
     BoumValueSensorDescription(
         key="daily_refill_1",
@@ -210,51 +257,63 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
         keys=("dailyRefill", "daily_refill"),
         value_type="boolean_text",
         icon="mdi:calendar-refresh",
+        source_order=("desired", "reported", "telemetry"),
     ),
     BoumValueSensorDescription(
         key="refill_time_1",
         translation_key="refill_time_1",
-        keys=("refillTimeOne", "refill_time_one"),
+        keys=("refillTimeOne", "refill_time_one", "refillTime1", "refill_time_1"),
         value_type="string",
         icon="mdi:clock-time-seven-outline",
+        source_order=("desired", "reported", "telemetry"),
     ),
     BoumValueSensorDescription(
         key="daily_refill_2",
         translation_key="daily_refill_2",
-        keys=("dailyRefillTwo", "daily_refill_two"),
+        keys=("dailyRefillTwo", "daily_refill_two", "dailyRefill2", "daily_refill_2"),
         value_type="boolean_text",
         icon="mdi:calendar-refresh",
+        source_order=("desired", "reported", "telemetry"),
     ),
     BoumValueSensorDescription(
         key="refill_time_2",
         translation_key="refill_time_2",
-        keys=("refillTimeTwo", "refill_time_two"),
+        keys=("refillTimeTwo", "refill_time_two", "refillTime2", "refill_time_2"),
         value_type="string",
         icon="mdi:clock-time-seven-outline",
+        source_order=("desired", "reported", "telemetry"),
     ),
     BoumValueSensorDescription(
         key="daily_refill_3",
         translation_key="daily_refill_3",
-        keys=("dailyRefillThree", "daily_refill_three"),
+        keys=("dailyRefillThree", "daily_refill_three", "dailyRefill3", "daily_refill_3"),
         value_type="boolean_text",
         icon="mdi:calendar-refresh",
+        source_order=("desired", "reported", "telemetry"),
     ),
     BoumValueSensorDescription(
         key="refill_time_3",
         translation_key="refill_time_3",
-        keys=("refillTimeThree", "refill_time_three"),
+        keys=("refillTimeThree", "refill_time_three", "refillTime3", "refill_time_3"),
         value_type="string",
         icon="mdi:clock-time-seven-outline",
+        source_order=("desired", "reported", "telemetry"),
     ),
 )
 
-KNOWN_SENSOR_KEYS = {key.lower().replace("_", "") for description in SENSOR_DESCRIPTIONS for key in description.keys}
+KNOWN_SENSOR_KEYS = {
+    _normalise_key(key)
+    for description in SENSOR_DESCRIPTIONS
+    for key in description.keys
+}
 TOP_LEVEL_SKIP_KEYS = {
     "state",
     "reported",
     "desired",
     "_claimed_device",
     "_device_detail",
+    "_owner",
+    "_api_user",
     "_latest_telemetry",
     "_latest_telemetry_last_hour",
     "_latest_telemetry_last_7d",
@@ -276,9 +335,48 @@ DYNAMIC_SKIP_KEYS = {
     "nickname",
     "alias",
     "email",
+    "owner",
+    "user",
+    "password",
     "accesstoken",
     "refreshtoken",
+    "token",
+    "pushtoken",
+    "preview",
+    "length",
+    "truncated",
+}
+SENSITIVE_PATH_TOKENS = (
+    "token",
     "password",
+    "secret",
+    "auth",
+    "credential",
+    "push",
+    "email",
+)
+PLANT_CONTEXT_KEYS = {
+    "plant",
+    "plants",
+    "plantdata",
+    "plantdetails",
+    "pot",
+    "pots",
+    "garden",
+    "gardens",
+    "crop",
+    "crops",
+}
+PLANT_NAME_KEYS = {
+    "plantname",
+    "plant_name",
+    "plantlabel",
+    "plant_label",
+    "cropname",
+    "crop_name",
+    "species",
+    "botanicalname",
+    "botanical_name",
 }
 
 
@@ -293,11 +391,12 @@ async def async_setup_entry(
 
     for device_id, device in coordinator.data.items():
         entities.append(BoumDeviceOverviewSensor(coordinator, device_id))
-        reported = reported_state(device)
-        desired = desired_state(device)
-        telemetry = telemetry_state(device)
+        entities.append(BoumPlantSummarySensor(coordinator, device_id))
+        entities.append(BoumPumpSyncSensor(coordinator, device_id))
+        sources = _sources(device)
+
         for description in SENSOR_DESCRIPTIONS:
-            if _find_known_value(reported, desired, telemetry, description.keys) is not None:
+            if _find_known_value(sources, description.keys, description.source_order) is not None:
                 entities.append(BoumValueSensor(coordinator, device_id, description))
 
         for path, source in _dynamic_scalar_paths(device):
@@ -344,16 +443,17 @@ class BoumDeviceOverviewSensor(BoumBaseSensor):
     def native_value(self) -> str | None:
         if not self._device:
             return None
-        reported = reported_state(self._device)
-        desired = desired_state(self._device)
-        telemetry = telemetry_state(self._device)
-        for key in ("status", "deviceStatus", "connectionState", "online", "pumpState"):
-            value = reported.get(key, desired.get(key, telemetry.get(key)))
+        sources = _sources(self._device)
+        for key in ("status", "deviceStatus", "connectionState", "online"):
+            value = _find_known_value(sources, (key,), ("reported", "telemetry", "desired"))
             if value not in (None, ""):
                 return str(value)
-        if telemetry:
+        pump = _find_known_value(sources, PUMP_STATE_KEYS, ("desired", "reported", "telemetry"))
+        if pump not in (None, ""):
+            return f"pump {pump}"
+        if sources["telemetry"]:
             return "telemetry"
-        if reported:
+        if sources["reported"]:
             return "online"
         return "unavailable"
 
@@ -361,6 +461,7 @@ class BoumDeviceOverviewSensor(BoumBaseSensor):
     def extra_state_attributes(self) -> dict[str, Any]:
         if not self._device:
             return {}
+        plants = _extract_plants(self._device)
         return {
             "device_id": device_id_from_device(self._device),
             "name": device_name(self._device),
@@ -378,6 +479,8 @@ class BoumDeviceOverviewSensor(BoumBaseSensor):
                 )
                 if self._device.get(key)
             ],
+            "plant_names": [plant.get("name") for plant in plants if plant.get("name")],
+            "plant_count": len(plants),
             "reported": compact_attributes(reported_state(self._device)),
             "desired": compact_attributes(desired_state(self._device)),
             "latest_telemetry": compact_attributes(telemetry_state(self._device)),
@@ -388,8 +491,76 @@ class BoumDeviceOverviewSensor(BoumBaseSensor):
                 self._device.get("_latest_telemetry_last_7d", {})
             ),
             "telemetry_summary": compact_attributes(self._device.get("_telemetry_summary", {})),
-            "owner": compact_attributes(self._device.get("_owner", {})),
             "api_errors": compact_attributes(self._device.get("_api_errors", {})),
+        }
+
+
+class BoumPlantSummarySensor(BoumBaseSensor):
+    """Plant summary sensor."""
+
+    _attr_translation_key = "plant_summary"
+    _attr_icon = "mdi:sprout"
+    _attr_native_unit_of_measurement = "plants"
+
+    def __init__(self, coordinator: BoumGardenDataUpdateCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{DOMAIN}_{device_id}_plants"
+
+    @property
+    def native_value(self) -> int | None:
+        if not self._device:
+            return None
+        return len(_extract_plants(self._device))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        if not self._device:
+            return {}
+        plants = _extract_plants(self._device)
+        return {
+            "names": [plant.get("name") for plant in plants if plant.get("name")],
+            "plants": compact_attributes(plants),
+            "note": "0 means no plant objects/names were returned by the API payloads currently fetched.",
+        }
+
+
+class BoumPumpSyncSensor(BoumBaseSensor):
+    """Shows whether desired and reported pump states match."""
+
+    _attr_translation_key = "pump_sync"
+    _attr_icon = "mdi:sync"
+
+    def __init__(self, coordinator: BoumGardenDataUpdateCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{DOMAIN}_{device_id}_pump_sync"
+
+    @property
+    def native_value(self) -> str | None:
+        if not self._device:
+            return None
+        reported = find_value(reported_state(self._device), PUMP_STATE_KEYS)
+        desired = find_value(desired_state(self._device), PUMP_STATE_KEYS)
+        if reported is None and desired is None:
+            return "unknown"
+        if desired is None:
+            return "reported_only"
+        if reported is None:
+            return "desired_pending"
+        if _normalise_state(reported) == _normalise_state(desired):
+            return "synced"
+        return "pending"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        if not self._device:
+            return {}
+        return {
+            "desired_pump_state": find_value(desired_state(self._device), PUMP_STATE_KEYS),
+            "reported_pump_state": find_value(reported_state(self._device), PUMP_STATE_KEYS),
+            "explanation": (
+                "Boum writes commands to state.desired. The device may update "
+                "state.reported only after it has received/executed the command."
+            ),
         }
 
 
@@ -412,10 +583,10 @@ class BoumValueSensor(BoumBaseSensor):
     def native_value(self) -> Any:
         if not self._device:
             return None
-        reported = reported_state(self._device)
-        desired = desired_state(self._device)
-        telemetry = telemetry_state(self._device)
-        value = _find_known_value(reported, desired, telemetry, self.entity_description.keys)
+        sources = _sources(self._device)
+        value = _find_known_value(
+            sources, self.entity_description.keys, self.entity_description.source_order
+        )
 
         if self.entity_description.value_type == "float":
             return as_float(value)
@@ -435,19 +606,18 @@ class BoumValueSensor(BoumBaseSensor):
     def extra_state_attributes(self) -> dict[str, Any]:
         if not self._device:
             return {}
-        reported = reported_state(self._device)
-        desired = desired_state(self._device)
-        telemetry = telemetry_state(self._device)
-        return {
+        sources = _sources(self._device)
+        attrs: dict[str, Any] = {
             "source_keys": self.entity_description.keys,
-            "raw_reported_value": find_value(reported, self.entity_description.keys),
-            "raw_desired_value": find_value(desired, self.entity_description.keys),
-            "raw_telemetry_value": find_value(telemetry, self.entity_description.keys),
+            "source_order": self.entity_description.source_order,
         }
+        for source_name, source_data in sources.items():
+            attrs[f"raw_{source_name}_value"] = find_value(source_data, self.entity_description.keys)
+        return attrs
 
 
 class BoumDynamicValueSensor(BoumBaseSensor):
-    """Dynamic sensor for scalar Boum values not covered by known sensors."""
+    """Dynamic sensor for useful scalar Boum values not covered by known sensors."""
 
     def __init__(
         self,
@@ -489,40 +659,48 @@ class BoumDynamicValueSensor(BoumBaseSensor):
         return {"source": self._source, "path": self._path}
 
 
+def _sources(device: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    return {
+        "reported": reported_state(device),
+        "desired": desired_state(device),
+        "telemetry": telemetry_state(device),
+        "telemetry_last_hour": device.get("_latest_telemetry_last_hour", {})
+        if isinstance(device.get("_latest_telemetry_last_hour"), Mapping)
+        else {},
+        "telemetry_last_7d": device.get("_latest_telemetry_last_7d", {})
+        if isinstance(device.get("_latest_telemetry_last_7d"), Mapping)
+        else {},
+    }
+
+
 def _find_known_value(
-    reported: Mapping[str, Any],
-    desired: Mapping[str, Any],
-    telemetry: Mapping[str, Any],
+    sources: Mapping[str, Mapping[str, Any]],
     keys: tuple[str, ...],
+    source_order: tuple[str, ...],
 ) -> Any:
-    value = find_value(reported, keys)
-    if value is not None:
-        return value
-    value = find_value(telemetry, keys)
-    if value is not None:
-        return value
-    return find_value(desired, keys)
+    for source_name in source_order:
+        value = find_value(sources.get(source_name, {}), keys)
+        if value is not None:
+            return value
+    return None
 
 
 def _dynamic_scalar_paths(device: Mapping[str, Any]) -> list[tuple[str, str]]:
     paths: list[tuple[str, str]] = []
     for source, data in (
         ("reported", reported_state(device)),
+        ("desired", desired_state(device)),
         ("telemetry", telemetry_state(device)),
         ("telemetry_last_hour", device.get("_latest_telemetry_last_hour", {})),
         ("telemetry_last_7d", device.get("_latest_telemetry_last_7d", {})),
-        ("desired", desired_state(device)),
-        ("owner", device.get("_owner", {})),
-        ("device", {k: v for k, v in device.items() if k not in TOP_LEVEL_SKIP_KEYS}),
     ):
         for path, value in _flatten_scalars(data):
             normalised_last_key = _normalise_key(path.split(".")[-1])
             if normalised_last_key in KNOWN_SENSOR_KEYS or normalised_last_key in DYNAMIC_SKIP_KEYS:
                 continue
-            if value in (None, ""):
+            if _path_is_sensitive(path) or not _value_is_reasonable_dynamic(value):
                 continue
             paths.append((path, source))
-    # Keep deterministic order and avoid duplicate unique IDs.
     seen: set[tuple[str, str]] = set()
     unique: list[tuple[str, str]] = []
     for item in paths:
@@ -570,13 +748,90 @@ def _value_at_path(data: Any, path: str) -> Any:
 def _source_mapping(device: Mapping[str, Any], source: str) -> Any:
     return {
         "reported": reported_state(device),
+        "desired": desired_state(device),
         "telemetry": telemetry_state(device),
         "telemetry_last_hour": device.get("_latest_telemetry_last_hour", {}),
         "telemetry_last_7d": device.get("_latest_telemetry_last_7d", {}),
-        "desired": desired_state(device),
-        "owner": device.get("_owner", {}),
-        "device": device,
     }.get(source, {})
+
+
+def _extract_plants(device: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Extract plant-like objects from the payloads Boum exposes, if any."""
+    plants: list[dict[str, Any]] = []
+    for source_name, payload in (
+        ("reported", reported_state(device)),
+        ("desired", desired_state(device)),
+        ("telemetry", telemetry_state(device)),
+        ("claimed", device.get("_claimed_device", {})),
+        ("detail", device.get("_device_detail", {})),
+    ):
+        _collect_plants(payload, plants, source_name=source_name, in_context=False)
+
+    unique: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for plant in plants:
+        key = str(plant.get("name") or plant.get("index") or plant)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(plant)
+    return unique
+
+
+def _collect_plants(
+    data: Any,
+    plants: list[dict[str, Any]],
+    *,
+    source_name: str,
+    in_context: bool,
+    index: int | None = None,
+) -> None:
+    if isinstance(data, Mapping):
+        normalised_keys = {_normalise_key(str(key)): key for key in data}
+        name = None
+        for key in PLANT_NAME_KEYS:
+            original = normalised_keys.get(_normalise_key(key))
+            if original is not None and data.get(original) not in (None, ""):
+                name = str(data.get(original))
+                break
+        if name is None and in_context:
+            for key in ("name", "label", "displayName", "display_name", "friendlyName"):
+                if key in data and data.get(key) not in (None, ""):
+                    name = str(data.get(key))
+                    break
+        if name is not None:
+            plant: dict[str, Any] = {
+                "name": name,
+                "source": source_name,
+            }
+            if index is not None:
+                plant["index"] = index + 1
+            for key, value in data.items():
+                if isinstance(value, (str, int, float, bool)) or value is None:
+                    if not _path_is_sensitive(str(key)):
+                        plant[str(key)] = value
+            plants.append(plant)
+
+        for key, value in data.items():
+            key_norm = _normalise_key(str(key))
+            child_context = in_context or key_norm in PLANT_CONTEXT_KEYS
+            if isinstance(value, list):
+                for idx, item in enumerate(value):
+                    if isinstance(item, str) and child_context and item:
+                        plants.append({"name": item, "source": source_name, "index": idx + 1})
+                    else:
+                        _collect_plants(
+                            item,
+                            plants,
+                            source_name=source_name,
+                            in_context=child_context,
+                            index=idx,
+                        )
+            elif isinstance(value, Mapping):
+                _collect_plants(value, plants, source_name=source_name, in_context=child_context)
+    elif isinstance(data, list):
+        for idx, item in enumerate(data):
+            _collect_plants(item, plants, source_name=source_name, in_context=in_context, index=idx)
 
 
 def _normalise_boolean_text(value: Any) -> str | None:
@@ -590,6 +845,15 @@ def _normalise_boolean_text(value: Any) -> str | None:
     if text in {"0", "false", "no", "off", "offline", "disconnected"}:
         return "off"
     return str(value)
+
+
+def _normalise_state(value: Any) -> str:
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "on", "online", "open", "running"}:
+        return "on"
+    if text in {"0", "false", "no", "off", "offline", "closed", "stopped"}:
+        return "off"
+    return text
 
 
 def _slugify(text: str) -> str:
@@ -616,7 +880,7 @@ def _metadata_for_path(path: str) -> dict[str, Any]:
         metadata["icon"] = "mdi:cup-water"
     if "pump" in lowered:
         metadata["icon"] = "mdi:water-pump"
-    if any(token in lowered for token in ("plant", "garden", "grow")):
+    if any(token in lowered for token in ("plant", "garden", "grow", "crop", "pot")):
         metadata["icon"] = "mdi:sprout"
     if any(token in lowered for token in ("moist", "soil", "humidity")):
         metadata.update(
@@ -661,7 +925,7 @@ def _metadata_for_path(path: str) -> dict[str, Any]:
         metadata["icon"] = "mdi:water-alert"
     if "firmware" in lowered or "version" in lowered:
         metadata["icon"] = "mdi:chip"
-    if any(token in lowered for token in ("time", "date", "timestamp", "createdat", "updatedat")):
+    if any(token in lowered for token in ("time", "date", "timestamp", "createdat", "updatedat", "pumped", "watered")):
         metadata.update(
             {
                 "icon": "mdi:clock-outline",
@@ -670,6 +934,19 @@ def _metadata_for_path(path: str) -> dict[str, Any]:
             }
         )
     return {key: value for key, value in metadata.items() if value is not None}
+
+
+def _path_is_sensitive(path: str) -> bool:
+    lowered = _normalise_key(path)
+    return any(token in lowered for token in SENSITIVE_PATH_TOKENS)
+
+
+def _value_is_reasonable_dynamic(value: Any) -> bool:
+    if value in (None, ""):
+        return False
+    if isinstance(value, str) and len(value) > 120:
+        return False
+    return True
 
 
 def _normalise_key(text: str) -> str:

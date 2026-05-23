@@ -14,7 +14,24 @@ from .const import (
     DOMAIN,
 )
 
-TO_REDACT = {CONF_ACCESS_TOKEN, CONF_REFRESH_TOKEN, "password", "accessToken", "refreshToken"}
+TO_REDACT = {
+    CONF_ACCESS_TOKEN,
+    CONF_REFRESH_TOKEN,
+    "password",
+    "accessToken",
+    "access_token",
+    "refreshToken",
+    "refresh_token",
+    "idToken",
+    "token",
+    "apiKey",
+    "authorization",
+    "Authorization",
+    "email",
+    "pushToken",
+    "pushTokens",
+    "deviceToken",
+}
 
 
 async def async_get_config_entry_diagnostics(

@@ -34,7 +34,10 @@ Large telemetry series are **not** stored as full entity attributes to avoid blo
 - Owner fetching
 - Telemetry fetching for default/24h, last hour and last 7 days
 - Status sensor with compact raw `reported`, `desired`, latest telemetry and API section attributes
-- Dynamic sensors for scalar values returned by the API, including nested plant data when Boum exposes it
+- Plant summary sensor that extracts plant objects/names when the API exposes them
+- Pump desired/reported/sync sensors so it is visible when a command is pending
+- Dynamic sensors for useful scalar values returned by `reported`, `desired` and latest telemetry
+- Owner/user/token-like API fields are not exposed as normal entities to avoid nonsense values and privacy leaks
 - Common friendly sensors when matching fields are present:
   - battery
   - temperature
@@ -141,6 +144,8 @@ target:
 
 ## Notes
 
-The public Boum API documentation does not define every possible reported telemetry field. For this reason, the integration creates friendly known sensors where possible and also creates dynamic sensors for scalar values returned by `reported`, `desired`, latest telemetry, owner and device metadata.
+The public Boum API documentation does not define every possible reported telemetry field and does not document a separate plant catalogue endpoint. For this reason, the integration creates friendly known sensors where possible and extracts plant objects/names only when they appear in `reported`, `desired`, device detail or telemetry payloads.
 
-If Boum exposes plant objects such as `plants[0].moisture`, they should appear as dynamic sensors after a Home Assistant restart/reload. If a new field only appears later, reload the integration so Home Assistant can create the new entity.
+The full raw payload is available via Home Assistant diagnostics. If the plant names are not in diagnostics either, the public API currently does not expose them to this integration.
+
+If Boum exposes plant objects such as `plants[0].moisture`, they should appear in the plant summary and as dynamic sensors after a Home Assistant restart/reload. If a new field only appears later, reload the integration so Home Assistant can create the new entity.

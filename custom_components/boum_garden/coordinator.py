@@ -12,7 +12,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import BoumApiClient, BoumApiError
 from .const import DOMAIN
-from .helpers import compact_attributes, device_id_from_device
+from .helpers import compact_attributes, desired_state, device_id_from_device
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -109,7 +109,8 @@ class BoumGardenDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict[str, 
                     for payload in telemetry_payloads.values()
                     if payload is not None
                 )
-                full["_api_user"] = compact_attributes(self.user)
+                # User/owner data stays available in diagnostics but should not be
+                # turned into Home Assistant entities.
                 if device_errors:
                     full["_api_errors"] = device_errors
                 return device_id_from_device(full), full
@@ -119,6 +120,20 @@ class BoumGardenDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict[str, 
             return {device_id: device for device_id, device in pairs if device_id}
         except BoumApiError as err:
             raise UpdateFailed(str(err)) from err
+
+    def apply_local_desired_state(self, device_id: str, desired_patch: Mapping[str, Any]) -> None:
+        """Optimistically update state.desired so UI reflects commands immediately."""
+        if not self.data or device_id not in self.data:
+            return
+        data = dict(self.data)
+        device = dict(data[device_id])
+        state = dict(device.get("state") or {})
+        desired = dict(state.get("desired") or desired_state(device))
+        desired.update(dict(desired_patch))
+        state["desired"] = desired
+        device["state"] = state
+        data[device_id] = device
+        self.async_set_updated_data(data)
 
 
 def _latest_telemetry_row(payload: Any) -> dict[str, Any]:

@@ -68,9 +68,11 @@ class BoumPumpSwitch(CoordinatorEntity[BoumGardenDataUpdateCoordinator], SwitchE
             return None
         reported = reported_state(self._device)
         desired = desired_state(self._device)
-        value = find_value(reported, ("pumpState", "pump_state"))
+        # Prefer desired state so a manual switch command is visible immediately,
+        # even if the device reports its physical state later.
+        value = find_value(desired, ("pumpState", "pump_state"))
         if value is None:
-            value = find_value(desired, ("pumpState", "pump_state"))
+            value = find_value(reported, ("pumpState", "pump_state"))
         if value is None:
             return None
         return str(value).lower() in {"on", "true", "1", "open", "running"}
@@ -78,9 +80,11 @@ class BoumPumpSwitch(CoordinatorEntity[BoumGardenDataUpdateCoordinator], SwitchE
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn pump on."""
         await self._api.set_pump_state(self._device_id, True)
+        self.coordinator.apply_local_desired_state(self._device_id, {"pumpState": "on"})
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn pump off."""
         await self._api.set_pump_state(self._device_id, False)
+        self.coordinator.apply_local_desired_state(self._device_id, {"pumpState": "off"})
         await self.coordinator.async_request_refresh()

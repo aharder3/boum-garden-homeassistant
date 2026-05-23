@@ -134,7 +134,11 @@ class BoumGardenConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
+            data_schema=vol.Schema({
+                vol.Required(CONF_PASSWORD): TextSelector(
+                    TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                )
+            }),
             description_placeholders={"email": str(email)},
             errors=errors,
         )

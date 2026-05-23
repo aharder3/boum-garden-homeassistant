@@ -190,6 +190,11 @@ def as_timestamp(value: Any) -> datetime | None:
         seconds = float(value)
         if seconds > 10_000_000_000:  # milliseconds
             seconds = seconds / 1000
+        # Values like 0 / 1 are often counters or placeholder timestamps and
+        # Home Assistant would display them as "51 years ago". Ignore anything
+        # before 2000-01-01 for Boum device data.
+        if seconds < 946684800:
+            return None
         return datetime.fromtimestamp(seconds, tz=timezone.utc)
     if isinstance(value, str):
         text = value.strip()

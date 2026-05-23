@@ -122,6 +122,21 @@
       },
       "refill_time_3": {
         "name": "Nachfüllzeit 3"
+      },
+      "plant_summary": {
+        "name": "Pflanzen"
+      },
+      "pump_sync": {
+        "name": "Pumpen-Abgleich"
+      },
+      "pump_state_reported": {
+        "name": "Pumpenstatus gemeldet"
+      },
+      "pump_state_desired": {
+        "name": "Pumpenstatus gewünscht"
+      },
+      "last_pumped_raw": {
+        "name": "Zuletzt gegossen roh"
       }
     },
     "switch": {

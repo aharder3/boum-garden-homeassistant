@@ -122,6 +122,21 @@
       },
       "refill_time_3": {
         "name": "Refill time 3"
+      },
+      "plant_summary": {
+        "name": "Plants"
+      },
+      "pump_sync": {
+        "name": "Pump sync"
+      },
+      "pump_state_reported": {
+        "name": "Pump state reported"
+      },
+      "pump_state_desired": {
+        "name": "Pump state desired"
+      },
+      "last_pumped_raw": {
+        "name": "Last watered raw"
       }
     },
     "switch": {
