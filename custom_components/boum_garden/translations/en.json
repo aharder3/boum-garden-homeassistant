@@ -39,9 +39,13 @@
           "plant_name": "Local plant name (optional)",
           "plant_location": "Local location / area (optional)",
           "plant_icon": "Local icon, e.g. mdi:sprout",
-          "plants_json": "Multiple local plants as JSON (optional)"
+          "plants_json": "Multiple local plants as JSON (optional)",
+          "tank_preset": "Tank size",
+          "tank_volume_liters": "Tank volume in litres (custom only)",
+          "tank_empty_distance_cm": "Sensor distance when tank is empty in cm",
+          "tank_full_distance_cm": "Sensor distance when tank is full in cm"
         },
-        "description": "Optional local details are used when Boum does not expose plant names through the API. For multiple plants per pot, enter a JSON mapping, for example {\"Pflanztopf 02\":[{\"name\":\"Mint\"},{\"name\":\"Lemon verbena\"}]}. Last watered can also be derived from telemetry or Home Assistant pump actions."
+        "description": "Optional local plant data is only used when Boum does not expose plant names through the API. For water level: choose the tank size (small 32 L or large 35 L) and enter the sensor distances when the tank is empty and full. Without these two distance values, only the water distance is shown."
       }
     }
   },

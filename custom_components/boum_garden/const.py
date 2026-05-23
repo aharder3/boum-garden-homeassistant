@@ -8,7 +8,7 @@ from homeassistant.const import Platform
 DOMAIN = "boum_garden"
 NAME = "Boum Garden"
 MANUFACTURER = "Boum"
-VERSION = "0.2.8"
+VERSION = "0.2.9"
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.BUTTON]
 
@@ -21,6 +21,7 @@ CONF_PLANT_NAME = "plant_name"
 CONF_PLANT_LOCATION = "plant_location"
 CONF_PLANT_ICON = "plant_icon"
 CONF_PLANTS_JSON = "plants_json"
+CONF_TANK_PRESET = "tank_preset"
 CONF_TANK_VOLUME_LITERS = "tank_volume_liters"
 CONF_TANK_EMPTY_DISTANCE_CM = "tank_empty_distance_cm"
 CONF_TANK_FULL_DISTANCE_CM = "tank_full_distance_cm"
@@ -40,3 +41,10 @@ ENV_BASE_URLS = {
 
 DATA_API = "api"
 DATA_COORDINATOR = "coordinator"
+
+TANK_PRESETS = {
+    "custom": None,
+    "small_32l": 32.0,
+    "large_35l": 35.0,
+}
+DEFAULT_TANK_PRESET = "custom"

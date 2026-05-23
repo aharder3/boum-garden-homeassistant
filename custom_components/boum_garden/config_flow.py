@@ -30,7 +30,10 @@ from .const import (
     CONF_PLANTS_JSON,
     CONF_TANK_EMPTY_DISTANCE_CM,
     CONF_TANK_FULL_DISTANCE_CM,
+    CONF_TANK_PRESET,
     CONF_TANK_VOLUME_LITERS,
+    DEFAULT_TANK_PRESET,
+    TANK_PRESETS,
     CONF_REFRESH_TOKEN,
     CONF_SCAN_INTERVAL,
     DEFAULT_ENV,
@@ -193,6 +196,15 @@ class BoumGardenOptionsFlow(config_entries.OptionsFlow):
                         default=options.get(CONF_PLANTS_JSON, ""),
                     ): TextSelector(TextSelectorConfig(multiline=True)),
                     vol.Optional(
+                        CONF_TANK_PRESET,
+                        default=options.get(CONF_TANK_PRESET, DEFAULT_TANK_PRESET),
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=list(TANK_PRESETS.keys()),
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+                    vol.Optional(
                         CONF_TANK_VOLUME_LITERS,
                         default=str(options.get(CONF_TANK_VOLUME_LITERS, "")),
                     ): str,
@@ -209,7 +221,7 @@ class BoumGardenOptionsFlow(config_entries.OptionsFlow):
             description_placeholders={
                 "tank_help": (
                     "Use the main Boum tank volume, not the 2 L pot reservoir. "
-                    "Known Boum tanks are 32 L (small) and 35 L (large). "
+                    "Known Boum tanks are 32 L (small) and 35 L (large). Select the tank preset or use custom. "
                     "Water level is calculated only when Boum exposes a distance in cm."
                 )
             },

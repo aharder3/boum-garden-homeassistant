@@ -39,9 +39,13 @@
           "plant_name": "Pflanzenname lokal (optional)",
           "plant_location": "Standort / Bereich lokal (optional)",
           "plant_icon": "Icon lokal, z. B. mdi:sprout",
-          "plants_json": "Mehrere Pflanzen lokal als JSON (optional)"
+          "plants_json": "Mehrere Pflanzen lokal als JSON (optional)",
+          "tank_preset": "Tankgrösse",
+          "tank_volume_liters": "Tankvolumen in Liter (nur bei Benutzerdefiniert)",
+          "tank_empty_distance_cm": "Sensor-Abstand bei leerem Tank in cm",
+          "tank_full_distance_cm": "Sensor-Abstand bei vollem Tank in cm"
         },
-        "description": "Optionale lokale Angaben werden verwendet, wenn Boum Pflanzennamen nicht über die API liefert. Für mehrere Pflanzen pro Topf kann ein JSON-Mapping eingetragen werden, z. B. {\"Pflanztopf 02\":[{\"name\":\"Minze\"},{\"name\":\"Zitronenverbene\"}]}. „Zuletzt getränkt“ kann zusätzlich aus Telemetrie oder HA-Pumpenaktionen abgeleitet werden."
+        "description": "Optionale lokale Pflanzendaten werden nur verwendet, wenn Boum keine Pflanzennamen über die API liefert. Für den Wasserfüllstand: Tankgrösse wählen (klein 32 L oder gross 35 L) und die Sensor-Abstände bei leerem und vollem Tank eintragen. Ohne diese beiden Distanzwerte wird nur der Wasserabstand angezeigt."
       }
     }
   },
@@ -192,5 +196,6 @@
         "name": "WLAN-Zugangsdaten zurücksetzen"
       }
     }
-  }
+  },
+  "selector": {}
 }

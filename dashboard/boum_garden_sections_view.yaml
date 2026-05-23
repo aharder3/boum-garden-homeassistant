@@ -7,8 +7,8 @@
       - type: grid
         cards:
           - type: heading
-            icon: mdi:view-dashboard-outline
-            heading: Übersicht
+            icon: mdi:flower-tulip
+            heading: Pflanztöpfe
 
           - type: custom:auto-entities
             card:
@@ -18,74 +18,85 @@
             card_param: cards
             filter:
               include:
-                - entity_id: sensor.garten_batterie
+                - entity_id: sensor.garten_pflanzcontainer_*
                   options:
                     type: tile
-                    name: Batterie
-                    icon: mdi:battery
+                    icon: mdi:flower-tulip
                     color: green
-                - entity_id: sensor.garten_temperatur
-                  options:
-                    type: tile
-                    name: Temperatur
-                    icon: mdi:thermometer
-                    color: orange
-                - entity_id: sensor.garten_wasserfullstand
-                  options:
-                    type: tile
-                    name: Wasserfüllstand
-                    icon: mdi:cup-water
-                    color: blue
-                - entity_id: sensor.garten_wasserfüllstand
-                  options:
-                    type: tile
-                    name: Wasserfüllstand
-                    icon: mdi:cup-water
-                    color: blue
-                - entity_id: sensor.garten_wasserabstand
-                  options:
-                    type: tile
-                    name: Wasserabstand
-                    icon: mdi:arrow-expand-vertical
-                    color: cyan
-                - entity_id: sensor.garten_rssi
-                  options:
-                    type: tile
-                    name: WLAN
-                    icon: mdi:wifi
-                    color: cyan
-                - entity_id: sensor.garten_durchfluss
-                  options:
-                    type: tile
-                    name: Durchfluss
-                    icon: mdi:waves-arrow-right
-                    color: blue
-                - entity_id: switch.garten_pumpe
-                  options:
-                    type: tile
-                    name: Pumpe
-                    icon: mdi:water-pump
-                    color: blue
-                    tap_action:
-                      action: toggle
               exclude:
-                - entity_id: '*timestamp*'
-                - entity_id: '*telemetry*'
-                - entity_id: '*aqua*'
-                - entity_id: '*dreame*'
-                - entity_id: '*sweepy*'
-                - entity_id: '*api_user*'
-                - entity_id: '*owner*'
-                - entity_id: '*token*'
-                - entity_id: '*truncated*'
+                - entity_id: sensor.garten_pflanzcontainer_*_zuletzt_bewassert
+                - entity_id: sensor.garten_pflanzcontainer_*_zuletzt_bewaessert
+                - entity_id: sensor.garten_pflanzcontainer_*_zuletzt_bewässert
+                - entity_id: "*timestamp*"
+                - entity_id: "*telemetry*"
+                - entity_id: "*api_user*"
+                - entity_id: "*owner*"
+                - entity_id: "*token*"
+                - entity_id: "*preview*"
+                - entity_id: "*truncated*"
             sort:
               method: name
 
       - type: grid
         cards:
           - type: heading
-            icon: mdi:water
+            icon: mdi:chart-line
+            heading: Status & Verlauf
+
+          - type: sensor
+            entity: sensor.garten_batterie
+            name: Batterie
+            icon: mdi:battery
+            graph: line
+            detail: 2
+
+          - type: sensor
+            entity: sensor.garten_temperatur
+            name: Temperatur
+            icon: mdi:thermometer
+            graph: line
+            detail: 2
+
+          - type: sensor
+            entity: sensor.garten_wasserabstand
+            name: Wasserabstand
+            icon: mdi:arrow-expand-vertical
+            graph: line
+            detail: 2
+
+          - type: sensor
+            entity: sensor.garten_durchfluss
+            name: Durchfluss
+            icon: mdi:waves-arrow-right
+            graph: line
+            detail: 2
+
+          - type: history-graph
+            title: 24h Verlauf
+            hours_to_show: 24
+            entities:
+              - entity: sensor.garten_batterie
+                name: Batterie
+              - entity: sensor.garten_temperatur
+                name: Temperatur
+              - entity: sensor.garten_wasserabstand
+                name: Wasserabstand
+              - entity: sensor.garten_durchfluss
+                name: Durchfluss
+
+      - type: grid
+        cards:
+          - type: heading
+            icon: mdi:water-pump
             heading: Bewässerung
+
+          - type: tile
+            entity: switch.garten_pumpe
+            name: Pumpe
+            icon: mdi:water-pump
+            color: blue
+            tap_action:
+              action: toggle
 
           - type: custom:auto-entities
             card:
@@ -106,6 +117,17 @@
                     type: tile
                     name: Nächste Bewässerung
                     icon: mdi:calendar-clock
+                    color: blue
+                - entity_id: sensor.garten_pumpenstatus
+                  options:
+                    type: tile
+                    icon: mdi:pump
+                    color: blue
+                - entity_id: sensor.garten_pumpen_abgleich
+                  options:
+                    type: tile
+                    name: Pumpen-Abgleich
+                    icon: mdi:sync
                     color: blue
                 - entity_id: sensor.garten_nachfullzeit
                   options:
@@ -131,55 +153,22 @@
                     name: Nachfüllintervall
                     icon: mdi:calendar-refresh
                     color: cyan
-                - entity_id: sensor.garten_pumpenstatus
+                - entity_id: sensor.garten_maximale_pumpdauer
                   options:
                     type: tile
-                    name: Pumpenstatus
-                    icon: mdi:pump
-                    color: blue
-                - entity_id: sensor.garten_pumpen_abgleich
-                  options:
-                    type: tile
-                    name: Pumpen-Abgleich
-                    icon: mdi:sync
-                    color: blue
-                - entity_id: sensor.garten_leckage_erkennung
-                  options:
-                    type: tile
-                    name: Leckage
-                    icon: mdi:pipe-leak
-                    color: red
+                    name: Maximale Pumpdauer
+                    icon: mdi:timer-outline
+                    color: cyan
               exclude:
-                - entity_id: '*telemetry*'
-                - entity_id: '*timestamp*'
-                - entity_id: '*pflanzcontainer*'
-            sort:
-              method: name
-
-      - type: grid
-        cards:
-          - type: heading
-            icon: mdi:flower-tulip
-            heading: Pflanztöpfe
-
-          - type: custom:auto-entities
-            card:
-              type: grid
-              columns: 2
-              square: false
-            card_param: cards
-            filter:
-              include:
-                - entity_id: sensor.garten_pflanzcontainer_*
-                  options:
-                    type: tile
-                    icon: mdi:flower-tulip
-                    color: green
-              exclude:
-                - entity_id: '*zuletzt*bewassert*'
-                - entity_id: '*zuletzt*bewaessert*'
-                - entity_id: '*zuletzt*bewässert*'
-                - entity_id: '*timestamp*'
+                - entity_id: "*telemetry*"
+                - entity_id: "*timestamp*"
+                - entity_id: "*last_hour*"
+                - entity_id: "*last_7d*"
+                - entity_id: "*api_user*"
+                - entity_id: "*owner*"
+                - entity_id: "*token*"
+                - entity_id: "*preview*"
+                - entity_id: "*truncated*"
             sort:
               method: name
 
@@ -212,38 +201,98 @@
                     type: tile
                     icon: mdi:watering-can
                     color: blue
+              exclude:
+                - entity_id: "*timestamp*"
+                - entity_id: "*telemetry*"
+                - entity_id: "*api_user*"
+                - entity_id: "*owner*"
+                - entity_id: "*token*"
+                - entity_id: "*preview*"
+                - entity_id: "*truncated*"
             sort:
               method: name
 
       - type: grid
         cards:
           - type: heading
-            icon: mdi:chart-box-outline
-            heading: Weitere Gerätewerte
+            icon: mdi:gauge
+            heading: Tank & Gerät
 
           - type: custom:auto-entities
             card:
-              type: entities
-              title: Details
-              show_header_toggle: false
+              type: grid
+              columns: 2
+              square: false
+            card_param: cards
             filter:
               include:
+                - entity_id: sensor.garten_wasserfullstand
+                  options:
+                    type: tile
+                    name: Wasserfüllstand
+                    icon: mdi:water
+                    color: blue
+                - entity_id: sensor.garten_wasserfüllstand
+                  options:
+                    type: tile
+                    name: Wasserfüllstand
+                    icon: mdi:water
+                    color: blue
+                - entity_id: sensor.garten_wasserabstand
+                  options:
+                    type: tile
+                    name: Wasserabstand
+                    icon: mdi:arrow-expand-vertical
+                    color: cyan
+                - entity_id: sensor.garten_rssi
+                  options:
+                    type: tile
+                    name: WLAN
+                    icon: mdi:wifi
+                    color: blue
+                - entity_id: sensor.garten_wifi_strength
+                  options:
+                    type: tile
+                    name: WLAN
+                    icon: mdi:wifi
+                    color: blue
                 - entity_id: sensor.garten_firmware
-                - entity_id: sensor.garten_status
-                - entity_id: sensor.garten_maximale_pumpdauer
-                - entity_id: sensor.garten_zuletzt_gesehen
-                - entity_id: sensor.garten_battery_voltage*
-                - entity_id: sensor.garten_solar_voltage*
-                - entity_id: sensor.garten_input_current*
-                - entity_id: sensor.garten_temperature_esp*
+                  options:
+                    type: tile
+                    icon: mdi:chip
+                    color: grey
+                - entity_id: sensor.garten_leckage_erkennung
+                  options:
+                    type: tile
+                    icon: mdi:pipe-leak
+                    color: red
+                - entity_id: sensor.garten_batteriespannung
+                  options:
+                    type: tile
+                    icon: mdi:battery-charging
+                    color: green
+                - entity_id: sensor.garten_solarspannung
+                  options:
+                    type: tile
+                    icon: mdi:solar-power
+                    color: amber
+                - entity_id: sensor.garten_esp_temperatur
+                  options:
+                    type: tile
+                    icon: mdi:chip
+                    color: orange
               exclude:
-                - entity_id: '*timestamp*'
-                - entity_id: '*telemetry*timestamp*'
-                - entity_id: '*last_hour*'
-                - entity_id: '*last_7d*'
-                - entity_id: '*api_user*'
-                - entity_id: '*owner*'
-                - entity_id: '*token*'
+                - entity_id: "*telemetry*"
+                - entity_id: "*timestamp*"
+                - entity_id: "*last_hour*"
+                - entity_id: "*last_7d*"
+                - entity_id: "*battery_current*"
+                - entity_id: "*input_current*"
+                - entity_id: "*api_user*"
+                - entity_id: "*owner*"
+                - entity_id: "*token*"
+                - entity_id: "*preview*"
+                - entity_id: "*truncated*"
             sort:
               method: name
 
@@ -270,11 +319,14 @@
                     type: tile
                     color: blue
               exclude:
-                - entity_id: '*aqua*'
-                - entity_id: '*dreame*'
-                - entity_id: '*sweepy*'
-                - entity_id: '*api_user*'
-                - entity_id: '*owner*'
-                - entity_id: '*token*'
+                - entity_id: "*telemetry*"
+                - entity_id: "*timestamp*"
+                - entity_id: "*last_hour*"
+                - entity_id: "*last_7d*"
+                - entity_id: "*api_user*"
+                - entity_id: "*owner*"
+                - entity_id: "*token*"
+                - entity_id: "*preview*"
+                - entity_id: "*truncated*"
             sort:
               method: name

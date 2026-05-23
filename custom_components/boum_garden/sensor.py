@@ -26,7 +26,9 @@ from .const import (
     CONF_PLANTS_JSON,
     CONF_TANK_EMPTY_DISTANCE_CM,
     CONF_TANK_FULL_DISTANCE_CM,
+    CONF_TANK_PRESET,
     CONF_TANK_VOLUME_LITERS,
+    TANK_PRESETS,
     DATA_COORDINATOR,
     DOMAIN,
 )
@@ -812,19 +814,22 @@ def _water_liters_from_distance(options: Mapping[str, Any], device: Mapping[str,
         return round(max(direct, 0), 1), {"source": "named_api_liter_field", "api_liters": direct}
 
     distance = _water_distance_cm(device)
-    volume = _tank_option_float(options, CONF_TANK_VOLUME_LITERS)
+    preset = str(options.get(CONF_TANK_PRESET, "custom") or "custom")
+    preset_volume = TANK_PRESETS.get(preset)
+    volume = preset_volume if preset_volume is not None else _tank_option_float(options, CONF_TANK_VOLUME_LITERS)
     empty_cm = _tank_option_float(options, CONF_TANK_EMPTY_DISTANCE_CM)
     full_cm = _tank_option_float(options, CONF_TANK_FULL_DISTANCE_CM)
     meta = {
         "source": "distance_cm_calculation",
         "api_distance_cm": distance,
+        "tank_preset": preset,
         "tank_volume_liters": volume,
         "tank_empty_distance_cm": empty_cm,
         "tank_full_distance_cm": full_cm,
         "calculation": "(empty_cm - distance_cm) / (empty_cm - full_cm) * tank_volume_liters",
     }
     if distance is None or volume is None or empty_cm is None or full_cm is None:
-        meta["missing"] = "Needs a named API distance in cm plus tank_volume_liters, tank_empty_distance_cm and tank_full_distance_cm options. Known Boum tank volumes are 32 L (small) and 35 L (large); the 2 L value is the small reservoir inside each pot, not the main tank."
+        meta["missing"] = "Needs a named API distance in cm plus tank preset/custom volume, tank_empty_distance_cm and tank_full_distance_cm options. Known Boum tanks are 32 L (small) and 35 L (large); the 2 L value is the small reservoir inside each pot, not the main tank."
         return None, meta
     if volume <= 0 or empty_cm == full_cm:
         meta["invalid_configuration"] = True
