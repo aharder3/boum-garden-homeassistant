@@ -25,8 +25,6 @@ from .const import (
     CONF_PLANT_NAME,
     CONF_PLANTS_JSON,
     DATA_COORDINATOR,
-    DEFAULT_LOCAL_PLANTS,
-    DEFAULT_PLANT_CONTAINER_NAMES,
     DOMAIN,
 )
 from .coordinator import BoumGardenDataUpdateCoordinator
@@ -412,6 +410,7 @@ async def async_setup_entry(
         entities.append(BoumDeviceOverviewSensor(coordinator, device_id))
         entities.append(BoumConfiguredPlantSensor(coordinator, device_id))
         entities.append(BoumPlantSummarySensor(coordinator, device_id))
+        entities.append(BoumPotTableSensor(coordinator, device_id))
         for plant_entity in _plant_entities_for_device(coordinator, device_id, device):
             entities.append(plant_entity)
         entities.append(BoumDerivedLastWateredSensor(coordinator, device_id))
@@ -566,8 +565,8 @@ class BoumConfiguredPlantSensor(BoumBaseSensor):
             ],
             "note": (
                 "If Boum does not expose plant names through the API, this sensor uses "
-                "the locally configured Home Assistant options. Multiple plants can be "
-                "configured as JSON in the integration options."
+                "only locally configured Home Assistant options. Multiple plants can be "
+                "configured as JSON in the integration options; no fixed default mapping is used."
             ),
         }
 
@@ -682,6 +681,80 @@ class BoumPlantSummarySensor(BoumBaseSensor):
             ),
         }
 
+
+
+
+
+class BoumPotTableSensor(BoumBaseSensor):
+    """One table-style summary sensor for all Boum plant containers."""
+
+    _attr_icon = "mdi:table"
+    _attr_name = "Pflanztopf Tabelle"
+    _attr_native_unit_of_measurement = "pots"
+
+    def __init__(self, coordinator: BoumGardenDataUpdateCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{DOMAIN}_{device_id}_pot_table"
+
+    @property
+    def native_value(self) -> int | None:
+        if not self._device:
+            return None
+        return len(_api_plant_containers_for_device(self._device))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        if not self._device:
+            return {}
+        containers = _api_plant_containers_for_device(self._device)
+        rows = [_container_dashboard_row(container) for container in containers]
+        return compact_attributes(
+            {
+                "rows": rows,
+                "markdown_table": _containers_markdown_table(rows),
+                "containers": containers,
+                "source": "api_user_plants" if containers else None,
+                "note": "Each row is one Boum plantContainerId/pot. Multiple plants in the same pot are merged into one row.",
+            }
+        )
+
+
+class BoumApiPlantContainerSensor(BoumBaseSensor):
+    """One sensor per Boum app plant container/pot.
+
+    The state is a readable list of plants in this pot. Detailed plant and pot
+    data is exposed as attributes so dashboards can render it as a table/card.
+    """
+
+    _attr_icon = "mdi:flower-tulip"
+
+    def __init__(
+        self,
+        coordinator: BoumGardenDataUpdateCoordinator,
+        device_id: str,
+        container: Mapping[str, Any],
+        index: int,
+    ) -> None:
+        super().__init__(coordinator, device_id)
+        self._container_id = str(container.get("plant_container_id") or index)
+        self._index = index
+        self._attr_unique_id = f"{DOMAIN}_{device_id}_plant_container_{_slugify(self._container_id)}"
+        self._attr_name = str(container.get("pot_name") or f"Pflanzcontainer {index:02d}")
+
+    @property
+    def native_value(self) -> str | None:
+        container = _find_current_container(self._device or {}, self._container_id)
+        if not container:
+            return None
+        names = [str(name) for name in container.get("plant_names", []) if name]
+        return ", ".join(names) if names else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        container = _find_current_container(self._device or {}, self._container_id)
+        if not container:
+            return {}
+        return compact_attributes(container)
 
 
 class BoumApiPlantSensor(BoumBaseSensor):
@@ -958,10 +1031,191 @@ def _plant_entities_for_device(
     coordinator: BoumGardenDataUpdateCoordinator,
     device_id: str,
     device: Mapping[str, Any],
-) -> list[BoumApiPlantSensor]:
-    """Create one entity per Boum app plant if the user API exposes plants."""
+) -> list[SensorEntity]:
+    """Create one entity per Boum plant container/pot.
+
+    Boum can return several plants for the same plantContainerId. Home Assistant
+    should therefore show one pot/container entity with all plants as attributes,
+    instead of one separate pot per plant.
+    """
+    containers = _api_plant_containers_for_device(device)
+    if containers:
+        return [
+            BoumApiPlantContainerSensor(coordinator, device_id, container, index)
+            for index, container in enumerate(containers, start=1)
+        ]
+
+    # Fallback for payload shapes that expose plants but not container IDs.
     plants = _api_plants_for_device(device)
     return [BoumApiPlantSensor(coordinator, device_id, plant, index) for index, plant in enumerate(plants, start=1)]
+
+
+
+
+def _container_dashboard_row(container: Mapping[str, Any]) -> dict[str, Any]:
+    """Return a compact row for Lovelace table/dashboard cards."""
+    plants = container.get("plants") if isinstance(container.get("plants"), list) else []
+    return {
+        "topf": container.get("pot_name"),
+        "pflanzen": container.get("plants_text"),
+        "anzahl": container.get("plant_count"),
+        "wasserbedarf_total": container.get("water_usage_total"),
+        "wasserklasse": ", ".join(str(x) for x in container.get("water_classes", []) if x),
+        "wasser": ", ".join(str(x) for x in container.get("water_needs", []) if x),
+        "licht": ", ".join(str(x) for x in container.get("light_needs", []) if x),
+        "erde": ", ".join(str(x) for x in container.get("soil_types", []) if x),
+        "naehrstoffe": ", ".join(str(x) for x in container.get("nutrients", []) if x),
+        "temperatur": _temperature_range_text(container),
+        "bild": (container.get("image_urls") or [None])[0],
+        "plant_container_id": container.get("plant_container_id"),
+        "pflanzen_details": [
+            {
+                "name": plant.get("name"),
+                "latein": plant.get("latin_name"),
+                "produkt": plant.get("product_name"),
+                "wasserbedarf": plant.get("water_usage"),
+                "wasserklasse": plant.get("water_class"),
+                "licht": plant.get("light"),
+                "wasser": plant.get("water"),
+                "erde": plant.get("soil"),
+                "naehrstoffe": plant.get("nutrients"),
+                "bild": plant.get("image_url"),
+            }
+            for plant in plants
+        ],
+    }
+
+
+def _temperature_range_text(container: Mapping[str, Any]) -> str | None:
+    preferred_min = container.get("preferred_min_temperature")
+    preferred_max = container.get("preferred_max_temperature")
+    min_temp = container.get("min_temperature")
+    max_temp = container.get("max_temperature")
+    if preferred_min is not None and preferred_max is not None:
+        return f"ideal {preferred_min:g}–{preferred_max:g} °C"
+    if min_temp is not None and max_temp is not None:
+        return f"{min_temp:g}–{max_temp:g} °C"
+    return None
+
+
+def _containers_markdown_table(rows: list[dict[str, Any]]) -> str:
+    """Build a markdown table that can be shown in a Lovelace markdown card."""
+    lines = ["| Topf | Pflanzen | Wasser | Licht | Erde |", "|---|---|---:|---|---|"]
+    for row in rows:
+        lines.append(
+            "| {topf} | {pflanzen} | {wasser} | {licht} | {erde} |".format(
+                topf=_md_cell(row.get("topf")),
+                pflanzen=_md_cell(row.get("pflanzen")),
+                wasser=_md_cell(row.get("wasserbedarf_total")),
+                licht=_md_cell(row.get("licht")),
+                erde=_md_cell(row.get("erde")),
+            )
+        )
+    return "\n".join(lines)
+
+
+def _md_cell(value: Any) -> str:
+    if value in (None, "", [], {}):
+        return "–"
+    return str(value).replace("|", "\\|").replace("\n", " ")
+
+
+def _api_plant_containers_for_device(device: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Return one normalised item per plantContainerId.
+
+    Each container contains a list of all plants inside that pot plus aggregated
+    values that are useful for cards and table dashboards.
+    """
+    plants = _api_plants_for_device(device)
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for plant in plants:
+        container_id = str(plant.get("plant_container_id") or plant.get("pot_name") or "unknown")
+        grouped.setdefault(container_id, []).append(plant)
+
+    containers: list[dict[str, Any]] = []
+    for index, (container_id, items) in enumerate(grouped.items(), start=1):
+        pot_name = str(items[0].get("pot_name") or f"Pflanzcontainer {index:02d}")
+        names = [str(item.get("name")) for item in items if item.get("name")]
+        water_values = [as_float(item.get("water_usage")) for item in items]
+        water_values = [value for value in water_values if value is not None]
+        min_temps = [as_float(item.get("min_temperature")) for item in items]
+        min_temps = [value for value in min_temps if value is not None]
+        max_temps = [as_float(item.get("max_temperature")) for item in items]
+        max_temps = [value for value in max_temps if value is not None]
+        pref_min_temps = [as_float(item.get("min_prefered_temperature")) for item in items]
+        pref_min_temps = [value for value in pref_min_temps if value is not None]
+        pref_max_temps = [as_float(item.get("max_prefered_temperature")) for item in items]
+        pref_max_temps = [value for value in pref_max_temps if value is not None]
+
+        containers.append(
+            {
+                "pot_name": pot_name,
+                "plant_container_id": container_id,
+                "plant_count": len(items),
+                "plant_names": names,
+                "plants_text": ", ".join(names),
+                "plants": items,
+                "image_urls": _unique_list(item.get("image_url") for item in items),
+                "latin_names": _unique_list(item.get("latin_name") for item in items),
+                "product_names": _unique_list(item.get("product_name") for item in items),
+                "states": _unique_list(item.get("state") for item in items),
+                "water_usage_total": round(sum(water_values), 3) if water_values else None,
+                "water_usage_average": round(sum(water_values) / len(water_values), 3) if water_values else None,
+                "water_classes": _unique_list(item.get("water_class") for item in items),
+                "water_needs": _unique_list(item.get("water") for item in items),
+                "light_needs": _unique_list(item.get("light") for item in items),
+                "soil_types": _unique_list(item.get("soil") for item in items),
+                "nutrients": _unique_list(item.get("nutrients") for item in items),
+                "min_temperature": min(min_temps) if min_temps else None,
+                "max_temperature": max(max_temps) if max_temps else None,
+                "preferred_min_temperature": min(pref_min_temps) if pref_min_temps else None,
+                "preferred_max_temperature": max(pref_max_temps) if pref_max_temps else None,
+                "fertilizer_intervals_days": _unique_list(item.get("fertilizer_interval_days") for item in items),
+                "heights": _unique_list(item.get("height") for item in items),
+                "widths": _unique_list(item.get("width") for item in items),
+                "general_care": _care_by_plant(items, "general_care"),
+                "water_care": _care_by_plant(items, "water_care"),
+                "light_care": _care_by_plant(items, "light_care"),
+                "temperature_care": _care_by_plant(items, "temperature_care"),
+                "fertilizer_care": _care_by_plant(items, "fertilizer_care"),
+                "source": "api_user_plants",
+                "dashboard_hint": "One entity represents one Boum plantContainerId/pot. Multiple plants are listed in the plants attribute.",
+            }
+        )
+
+    containers.sort(key=lambda item: str(item.get("pot_name") or item.get("plant_container_id") or ""))
+    return containers
+
+
+def _find_current_container(device: Mapping[str, Any], container_id: str) -> dict[str, Any] | None:
+    for container in _api_plant_containers_for_device(device):
+        if str(container.get("plant_container_id")) == str(container_id):
+            return container
+    return None
+
+
+def _unique_list(values: Any) -> list[Any]:
+    result: list[Any] = []
+    seen: set[str] = set()
+    for value in values:
+        if value in (None, "", [], {}):
+            continue
+        key = json.dumps(value, sort_keys=True, default=str) if isinstance(value, (Mapping, list)) else str(value)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(value)
+    return result
+
+
+def _care_by_plant(plants: list[dict[str, Any]], key: str) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for plant in plants:
+        name = plant.get("name")
+        value = plant.get(key)
+        if name and isinstance(value, str) and value.strip():
+            result[str(name)] = value.strip()
+    return result
 
 
 def _api_plants_for_device(device: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -969,12 +1223,13 @@ def _api_plants_for_device(device: Mapping[str, Any]) -> list[dict[str, Any]]:
     raw = device.get("_api_plants")
     if not isinstance(raw, list):
         return []
+    container_names = _plant_container_display_names(raw)
     plants: list[dict[str, Any]] = []
     seen: set[str] = set()
     for index, item in enumerate(raw, start=1):
         if not isinstance(item, Mapping):
             continue
-        plant = _normalise_api_plant(item, index)
+        plant = _normalise_api_plant(item, index, container_names)
         key = str(plant.get("id") or plant.get("plant_id") or plant.get("name") or index)
         if key in seen:
             continue
@@ -984,7 +1239,66 @@ def _api_plants_for_device(device: Mapping[str, Any]) -> list[dict[str, Any]]:
     return plants
 
 
-def _normalise_api_plant(plant: Mapping[str, Any], index: int) -> dict[str, Any]:
+def _plant_container_display_names(raw_plants: list[Any]) -> dict[str, str]:
+    """Build generic, API-derived display names for plant containers.
+
+    Boum exposes a stable plantContainerId for each plant. If the API also
+    provides a human readable container name, use it. Otherwise create a neutral
+    per-account name based only on the order of container IDs returned by the API.
+    No user-specific plant/pot mapping is hard-coded here.
+    """
+    container_names: dict[str, str] = {}
+    for item in raw_plants:
+        if not isinstance(item, Mapping):
+            continue
+        container_id = item.get("plantContainerId")
+        if not container_id:
+            continue
+        container_id = str(container_id)
+        explicit = _explicit_container_name(item)
+        if explicit:
+            container_names[container_id] = explicit
+        elif container_id not in container_names:
+            container_names[container_id] = f"Pflanzcontainer {len(container_names) + 1:02d}"
+    return container_names
+
+
+def _explicit_container_name(plant: Mapping[str, Any]) -> str | None:
+    """Return a container/pot name if Boum exposes one in the plant object."""
+    for key in (
+        "plantContainerName",
+        "plant_container_name",
+        "containerName",
+        "container_name",
+        "potName",
+        "pot_name",
+        "gardenName",
+        "garden_name",
+    ):
+        value = plant.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        if isinstance(value, Mapping):
+            translated = value.get("de") or value.get("en") or next((v for v in value.values() if v), None)
+            if isinstance(translated, str) and translated.strip():
+                return translated.strip()
+
+    container = plant.get("plantContainer") or plant.get("container") or plant.get("pot")
+    if isinstance(container, Mapping):
+        for key in ("name", "displayName", "title", "label"):
+            value = container.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+            if isinstance(value, Mapping):
+                translated = value.get("de") or value.get("en") or next((v for v in value.values() if v), None)
+                if isinstance(translated, str) and translated.strip():
+                    return translated.strip()
+    return None
+
+
+def _normalise_api_plant(
+    plant: Mapping[str, Any], index: int, container_names: Mapping[str, str]
+) -> dict[str, Any]:
     """Convert a raw Boum plant object to compact, useful attributes."""
     translated = plant.get("translated") if isinstance(plant.get("translated"), Mapping) else {}
     name_translated = plant.get("nameTranslated") if isinstance(plant.get("nameTranslated"), Mapping) else {}
@@ -996,11 +1310,12 @@ def _normalise_api_plant(plant: Mapping[str, Any], index: int) -> dict[str, Any]
         or plant.get("plantId")
     )
     container_id = plant.get("plantContainerId")
-    pot_name = DEFAULT_PLANT_CONTAINER_NAMES.get(str(container_id), str(container_id or ""))
+    container_id_str = str(container_id) if container_id else ""
+    pot_name = container_names.get(container_id_str) or container_id_str
     result: dict[str, Any] = {
         "name": str(name) if name is not None else None,
         "pot_name": pot_name or None,
-        "plant_container_id": str(container_id) if container_id else None,
+        "plant_container_id": container_id_str or None,
         "plant_id": plant.get("plantId"),
         "id": plant.get("id") or plant.get("objectID") or plant.get("plantId"),
         "state": plant.get("state"),
@@ -1124,19 +1439,6 @@ def _local_plants_for_device(options: Mapping[str, Any], device: Mapping[str, An
                 break
     elif isinstance(parsed, list):
         value = parsed
-
-    # Fallback: Arthur's known Boum app mapping. This is only used when the
-    # Boum API does not expose plant names and no custom JSON option was set.
-    if value is None:
-        lower_defaults = {str(key).lower(): val for key, val in DEFAULT_LOCAL_PLANTS.items()}
-        for candidate in candidates:
-            if candidate in DEFAULT_LOCAL_PLANTS:
-                value = DEFAULT_LOCAL_PLANTS[candidate]
-                break
-            lowered = candidate.lower()
-            if lowered in lower_defaults:
-                value = lower_defaults[lowered]
-                break
 
     plants: list[dict[str, Any]] = []
     if isinstance(value, str):

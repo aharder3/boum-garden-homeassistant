@@ -8,7 +8,7 @@ from homeassistant.const import Platform
 DOMAIN = "boum_garden"
 NAME = "Boum Garden"
 MANUFACTURER = "Boum"
-VERSION = "0.1.8"
+VERSION = "0.2.0"
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.BUTTON]
 
@@ -32,56 +32,8 @@ ENV_BASE_URLS = {
     "local": "http://localhost:3000/dev/v1",
 }
 
-DEFAULT_LOCAL_PLANTS: dict[str, list[dict[str, str]]] = {
-    "Pflanztopf 01": [
-        {"name": "Zitronenmelisse", "icon": "mdi:leaf"},
-        {"name": "Basilikum", "icon": "mdi:sprout"},
-    ],
-    "Pflanztopf 02": [
-        {"name": "Minze", "icon": "mdi:leaf"},
-        {"name": "Zitronenverbene", "icon": "mdi:sprout"},
-    ],
-    "Pflanztopf 03": [
-        {"name": "Oregano", "icon": "mdi:sprout"},
-        {"name": "Salbei", "icon": "mdi:leaf"},
-    ],
-    "Pflanztopf 04": [
-        {"name": "Rosmarin", "icon": "mdi:sprout"},
-        {"name": "Oregano", "icon": "mdi:sprout"},
-    ],
-    "Pflanztopf 05": [
-        {"name": "Thymian", "icon": "mdi:flower"},
-        {"name": "Estragon", "icon": "mdi:leaf"},
-    ],
-    "Pflanztopf 06": [
-        {"name": "Garten-Petersilie", "icon": "mdi:sprout"},
-        {"name": "Koriander", "icon": "mdi:flower"},
-    ],
-    "Pflanztopf 07": [
-        {"name": "Majoran", "icon": "mdi:sprout"},
-    ],
-    "Pflanztopf 08": [
-        {"name": "Wald-Erdbeere", "icon": "mdi:fruit-cherries"},
-    ],
-    "Pflanztopf 09": [
-        {"name": "Garten-Petersilie", "icon": "mdi:sprout"},
-    ],
-}
-
-# Fallback mapping from Boum plantContainerId to the visible pot number/name in the app.
-# This is used only for naming/grouping plant entities; the actual plants are read from the API
-# when the user endpoint exposes them.
-DEFAULT_PLANT_CONTAINER_NAMES: dict[str, str] = {
-    "8JQCowYT06DET0A0PFbF": "Pflanztopf 01",
-    "7chPko8cD05mHlrFzOnX": "Pflanztopf 02",
-    "QBI3LML3HmHnoYGKYPNU": "Pflanztopf 03",
-    "3MAeoW554uDVkQIboCby": "Pflanztopf 04",
-    "kSo6yFh0TMZqNlakkP1M": "Pflanztopf 05",
-    "YWek5KKGv7IM7Hx2j8ev": "Pflanztopf 06",
-    "lkYEbqIwNOH52SLB6Jxh": "Pflanztopf 07",
-    "pMU9Lju87h2d4qDXgFIr": "Pflanztopf 08",
-    "cBt849HlRDRWzuJi6G7p": "Pflanztopf 09",
-}
+# Plant/container names are intentionally not hard-coded.
+# The integration derives them from Boum API data or optional user-provided settings.
 
 DATA_API = "api"
 DATA_COORDINATOR = "coordinator"

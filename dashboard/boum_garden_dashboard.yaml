@@ -1,0 +1,92 @@
+# Boum Garden Dashboard
+# Voraussetzungen für die dynamischen Karten: custom:auto-entities und Mushroom Cards.
+# Der Sensor "Pflanztopf Tabelle" enthält zusätzlich ein Attribut "markdown_table".
+# Falls die Markdown-Karte leer bleibt, ersetze sensor.boum_garden_pflanztopf_tabelle
+# durch die Entity-ID deines Boum-Sensors "Pflanztopf Tabelle".
+
+title: Boum Garden
+views:
+  - title: Pflanzen
+    path: boum-garden
+    icon: mdi:sprout
+    type: masonry
+    cards:
+      - type: markdown
+        title: Boum Garden Übersicht
+        content: >-
+          ## 🌱 Boum Garden
+
+          Die Integration fasst mehrere Pflanzen pro `plantContainerId` zu einem
+          Pflanztopf zusammen. Jeder Topf hat eine eigene Entität und enthält die
+          Pflanzen als Attribute.
+
+      - type: custom:auto-entities
+        card:
+          type: grid
+          title: Pflanztöpfe
+          columns: 2
+          square: false
+        card_param: cards
+        filter:
+          include:
+            - integration: boum_garden
+              entity_id: sensor.*pflanzcontainer*
+              options:
+                type: custom:mushroom-template-card
+                entity: this.entity_id
+                icon: mdi:flower-tulip
+                primary: "{{ state_attr(entity, 'pot_name') or state_attr(entity, 'plant_container_id') }}"
+                secondary: >-
+                  {{ states(entity) }}
+                  {% set water = state_attr(entity, 'water_usage_total') %}
+                  {% if water not in [none, ''] %} · Wasser: {{ water }}{% endif %}
+                multiline_secondary: true
+                tap_action:
+                  action: more-info
+            - integration: boum_garden
+              entity_id: sensor.*plant_container*
+              options:
+                type: custom:mushroom-template-card
+                entity: this.entity_id
+                icon: mdi:flower-tulip
+                primary: "{{ state_attr(entity, 'pot_name') or state_attr(entity, 'plant_container_id') }}"
+                secondary: >-
+                  {{ states(entity) }}
+                  {% set water = state_attr(entity, 'water_usage_total') %}
+                  {% if water not in [none, ''] %} · Wasser: {{ water }}{% endif %}
+                multiline_secondary: true
+                tap_action:
+                  action: more-info
+          exclude: []
+        sort:
+          method: name
+
+      - type: custom:auto-entities
+        card:
+          type: entities
+          title: Pumpen & Bewässerung
+          state_color: true
+        filter:
+          include:
+            - integration: boum_garden
+              entity_id: switch.*
+            - integration: boum_garden
+              entity_id: button.*
+            - integration: boum_garden
+              entity_id: sensor.*pump*
+            - integration: boum_garden
+              entity_id: sensor.*pumpe*
+            - integration: boum_garden
+              entity_id: sensor.*watered*
+            - integration: boum_garden
+              entity_id: sensor.*getrankt*
+        sort:
+          method: name
+
+      - type: markdown
+        title: Pflanztopf-Tabelle
+        content: >-
+          Ersetze die Entity-ID unten durch deine tatsächliche Entity
+          **Pflanztopf Tabelle**, falls Home Assistant sie anders benennt.
+
+          {{ state_attr('sensor.boum_garden_pflanztopf_tabelle', 'markdown_table') }}

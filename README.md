@@ -164,7 +164,7 @@ The full raw payload is available via Home Assistant diagnostics. If the plant n
 If Boum exposes plant objects such as `plants[0].moisture`, they should appear in the plant summary and as dynamic sensors after a Home Assistant restart/reload. If a new field only appears later, reload the integration so Home Assistant can create the new entity.
 
 
-## 0.1.8
+## 0.1.9
 
 - Fix Home Assistant 2026 OptionsFlow compatibility.
 - Fix sensor platform import error caused by `_normalise_key` initialisation order.
@@ -186,3 +186,28 @@ Wenn die Boum API keine Pflanzennamen liefert, nutzt die Integration als Fallbac
 - Pflanztopf 09: Garten-Petersilie
 
 Diese Zuordnung kann in den Integrationsoptionen über das JSON-Feld überschrieben werden.
+
+
+## Plant container mapping
+
+Plant names and plant care metadata are read from the Boum user API. The integration uses `plantContainerId` to group plants into containers. If Boum exposes a human-readable container name, that name is used; otherwise a neutral name such as `Pflanzcontainer 01` is generated from the API order. No Arthur-specific fixed pot mapping is included in the code.
+
+## Dashboard
+
+Ab Version 0.2.0 erstellt die Integration pro Boum-`plantContainerId` eine eigene Topf-Entität. Wenn mehrere Pflanzen im selben Topf sind, erscheinen sie in **einer** Entität und nicht als mehrere Töpfe. Zusätzlich gibt es den Sensor **Pflanztopf Tabelle** mit den Attributen `rows`, `containers` und `markdown_table`.
+
+Ein Beispiel-Dashboard liegt hier:
+
+```text
+/dashboard/boum_garden_dashboard.yaml
+```
+
+Die dynamischen Karten nutzen `custom:auto-entities` und Mushroom Cards. Die Markdown-Tabelle kann auch ohne Mushroom verwendet werden, sofern du die Entity-ID des Sensors **Pflanztopf Tabelle** einsetzt.
+
+## 0.2.0
+
+- Pro `plantContainerId` wird jetzt genau eine Pflanztopf-Entität erstellt.
+- Mehrere Pflanzen pro Topf werden als Pflanzenliste und Detailattribute zusammengeführt.
+- Neuer Sensor **Pflanztopf Tabelle** mit `rows`, `containers` und `markdown_table`.
+- Aggregierte Topf-Infos: Pflanzenanzahl, Pflanzennamen, Wasserbedarf, Wasserklasse, Lichtbedarf, Erde, Nährstoffe, Temperaturbereich, Bilder und Pflegehinweise.
+- Beispiel-Dashboard für Lovelace ergänzt.
