@@ -163,6 +163,14 @@
       },
       "energy_saving_mode": {
         "name": "Stromsparmodus"
+      },
+      "water_distance": {
+        "name": "Wasserabstand",
+        "state": {}
+      },
+      "water_liters_direct": {
+        "name": "Wasserfüllstand direkt",
+        "state": {}
       }
     },
     "switch": {

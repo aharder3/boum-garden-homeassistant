@@ -51,7 +51,7 @@ class BoumValueSensorDescription(SensorEntityDescription):
 
     keys: tuple[str, ...]
     value_type: str = "auto"
-    source_order: tuple[str, ...] = ("reported", "telemetry", "desired")
+    source_order: tuple[str, ...] = ("reported", "telemetry", "desired", "device", "detail")
 
 
 PUMP_STATE_KEYS = ("pumpState", "pump_state", "pump", "pumping", "pumpOn", "pump_on", "isPumping")
@@ -72,7 +72,7 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
     BoumValueSensorDescription(
         key="battery",
         translation_key="battery",
-        keys=("batteryCapacity", "battery", "batteryLevel", "batteryPercent", "batteryPercentage", "soc"),
+        keys=("batteryCapacity", "battery_capacity", "battery", "batteryLevel", "batteryPercent", "batteryPercentage", "stateOfCharge", "state_of_charge", "soc"),
         native_unit_of_measurement=PERCENTAGE,
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
@@ -82,7 +82,7 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
     BoumValueSensorDescription(
         key="temperature",
         translation_key="temperature",
-        keys=("temperature", "temp", "tC", "t_c"),
+        keys=("temperature", "temperatureC", "temperature_c", "temp", "tempC", "tC", "t_c", "ambientTemperature", "ambientTemp", "deviceTemperature"),
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
@@ -119,7 +119,7 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
     BoumValueSensorDescription(
         key="water_distance",
         translation_key="water_distance",
-        keys=("waterDistance", "waterDistanceCm", "water_distance", "water_distance_cm", "distance", "distanceCm", "sensorDistance", "sensorDistanceCm", "tankDistance", "tankDistanceCm", "waterLevelDistance", "waterLevelDistanceCm"),
+        keys=("waterDistance", "waterDistanceCm", "water_distance", "water_distance_cm", "distance", "distanceCm", "sensorDistance", "sensorDistanceCm", "tankDistance", "tankDistanceCm", "waterTankDistance", "waterTankDistanceCm", "waterLevelDistance", "waterLevelDistanceCm", "distanceToWater", "distanceToWaterCm", "waterSurfaceDistance", "waterSurfaceDistanceCm", "ultrasonicDistance", "ultrasonicDistanceCm", "tankSensorDistance", "tankSensorDistanceCm"),
         native_unit_of_measurement=UnitOfLength.CENTIMETERS,
         state_class=SensorStateClass.MEASUREMENT,
         value_type="float",
@@ -128,7 +128,7 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
     BoumValueSensorDescription(
         key="water_liters_direct",
         translation_key="water_liters_direct",
-        keys=("waterLiters", "waterLevelLiters", "waterVolumeLiters", "remainingWaterLiters", "reservoirLiters", "reservoirLevelLiters", "tankLevelLiters", "water_liters", "water_level_liters"),
+        keys=("waterLiters", "waterLevelLiters", "waterVolumeLiters", "remainingWaterLiters", "reservoirLiters", "reservoirLevelLiters", "tankLevelLiters", "tankRemainingLiters", "remainingTankLiters", "water_liters", "water_level_liters"),
         native_unit_of_measurement="L",
         state_class=SensorStateClass.MEASUREMENT,
         value_type="float",
@@ -146,7 +146,7 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
     BoumValueSensorDescription(
         key="rssi",
         translation_key="rssi",
-        keys=("rssi", "wifiRssi", "signalStrength"),
+        keys=("rssi", "wifiRssi", "signalStrength", "wifiStrength"),
         native_unit_of_measurement="dBm",
         device_class=SensorDeviceClass.SIGNAL_STRENGTH,
         state_class=SensorStateClass.MEASUREMENT,
@@ -393,6 +393,7 @@ DYNAMIC_SKIP_KEYS = {
     "truncated",
     "x",
     "y",
+    "timestamp",
 }
 SENSITIVE_PATH_TOKENS = (
     "token",
@@ -747,6 +748,8 @@ def _water_distance_cm(device: Mapping[str, Any]) -> float | None:
     value = _find_known_value(
         _sources(device),
         (
+            "waterTableRange",
+            "water_table_range",
             "waterDistance",
             "waterDistanceCm",
             "water_distance",
@@ -759,8 +762,18 @@ def _water_distance_cm(device: Mapping[str, Any]) -> float | None:
             "tankDistanceCm",
             "waterLevelDistance",
             "waterLevelDistanceCm",
+            "waterTankDistance",
+            "waterTankDistanceCm",
+            "distanceToWater",
+            "distanceToWaterCm",
+            "waterSurfaceDistance",
+            "waterSurfaceDistanceCm",
+            "ultrasonicDistance",
+            "ultrasonicDistanceCm",
+            "tankSensorDistance",
+            "tankSensorDistanceCm",
         ),
-        ("reported", "telemetry", "desired"),
+        ("reported", "telemetry", "desired", "device", "detail"),
     )
     return as_float(value)
 
@@ -779,8 +792,10 @@ def _direct_water_liters(device: Mapping[str, Any]) -> float | None:
             "tankLevelLiters",
             "water_liters",
             "water_level_liters",
+            "tankRemainingLiters",
+            "remainingTankLiters",
         ),
-        ("reported", "telemetry", "desired"),
+        ("reported", "telemetry", "desired", "device", "detail"),
     )
     return as_float(value)
 
@@ -809,7 +824,7 @@ def _water_liters_from_distance(options: Mapping[str, Any], device: Mapping[str,
         "calculation": "(empty_cm - distance_cm) / (empty_cm - full_cm) * tank_volume_liters",
     }
     if distance is None or volume is None or empty_cm is None or full_cm is None:
-        meta["missing"] = "Needs named API distance plus tank_volume_liters, tank_empty_distance_cm and tank_full_distance_cm options."
+        meta["missing"] = "Needs a named API distance in cm plus tank_volume_liters, tank_empty_distance_cm and tank_full_distance_cm options. Known Boum tank volumes are 32 L (small) and 35 L (large); the 2 L value is the small reservoir inside each pot, not the main tank."
         return None, meta
     if volume <= 0 or empty_cm == full_cm:
         meta["invalid_configuration"] = True
@@ -874,7 +889,7 @@ class BoumEnergySavingModeSensor(BoumBaseSensor):
         if not self._device:
             return None
         sources = _sources(self._device)
-        direct = _find_known_value(sources, ("powerSaving", "powerSavingMode", "energySaving", "energySavingMode", "ecoMode", "sleepMode"), ("reported", "desired", "telemetry"))
+        direct = _find_known_value(sources, ("powerSaving", "powerSavingMode", "energySaving", "energySavingMode", "ecoMode", "sleepMode"), ("reported", "desired", "telemetry", "device", "detail"))
         if direct not in (None, ""):
             return _normalise_boolean_text(direct)
         return None
@@ -882,7 +897,7 @@ class BoumEnergySavingModeSensor(BoumBaseSensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         sources = _sources(self._device or {})
-        direct = _find_known_value(sources, ("powerSaving", "powerSavingMode", "energySaving", "energySavingMode", "ecoMode", "sleepMode"), ("reported", "desired", "telemetry"))
+        direct = _find_known_value(sources, ("powerSaving", "powerSavingMode", "energySaving", "energySavingMode", "ecoMode", "sleepMode"), ("reported", "desired", "telemetry", "device", "detail"))
         return {
             "source": "named_api_field",
             "api_raw_value": direct,
@@ -1267,10 +1282,20 @@ class BoumDynamicValueSensor(BoumBaseSensor):
 
 
 def _sources(device: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    """Return API sections used for known sensors.
+
+    Boum can expose values either in state.reported/state.desired, in the
+    latest telemetry row, or directly on the device/detail object. Keep this
+    intentionally limited to known sensor lookups; dynamic sensors still use
+    reported/desired/telemetry only.
+    """
+    detail = device.get("_device_detail", {}) if isinstance(device.get("_device_detail"), Mapping) else {}
     return {
         "reported": reported_state(device),
         "desired": desired_state(device),
         "telemetry": telemetry_state(device),
+        "device": device,
+        "detail": detail,
         "telemetry_last_hour": device.get("_latest_telemetry_last_hour", {})
         if isinstance(device.get("_latest_telemetry_last_hour"), Mapping)
         else {},

@@ -241,7 +241,21 @@ def _group_plants_by_container(plants: list[dict[str, Any]]) -> dict[str, list[d
     return grouped
 
 def _latest_telemetry_row(payload: Any) -> dict[str, Any]:
-    """Extract the latest telemetry row from common API response shapes."""
+    """Extract latest telemetry values.
+
+    Boum's /devices/:id/data endpoint can return a shape like:
+
+        {"data": {"timeSeries": {"batteryCapacity": [{"x": "...", "y": 88.1}], ...}}}
+
+    Earlier versions treated the first list of x/y points as an anonymous row,
+    which lost the series name and made it impossible to distinguish battery,
+    temperature and water distance. This function keeps the time-series names as
+    keys, e.g. batteryCapacity=88.1, temperature=22.0, waterTableRange=15.1.
+    """
+    named = _latest_named_timeseries_values(payload)
+    if named:
+        return named
+
     rows = _find_telemetry_rows(payload)
     if not rows:
         if isinstance(payload, Mapping):
@@ -250,13 +264,67 @@ def _latest_telemetry_row(payload: Any) -> dict[str, Any]:
         return {}
 
     def sort_key(row: Mapping[str, Any]) -> str:
-        for key in ("timestamp", "time", "createdAt", "created_at", "date", "ts"):
+        for key in ("timestamp", "time", "createdAt", "created_at", "date", "ts", "x"):
             value = row.get(key)
             if value not in (None, ""):
                 return str(value)
         return ""
 
     return dict(sorted(rows, key=sort_key)[-1])
+
+
+def _latest_named_timeseries_values(payload: Any) -> dict[str, Any]:
+    """Return the latest non-null y value for every named Boum time series."""
+    time_series = _find_time_series_mapping(payload)
+    if not time_series:
+        return {}
+
+    latest: dict[str, Any] = {}
+    timestamps: dict[str, Any] = {}
+
+    for name, points in time_series.items():
+        if not isinstance(points, list):
+            continue
+        latest_point: Mapping[str, Any] | None = None
+        for point in points:
+            if not isinstance(point, Mapping):
+                continue
+            if point.get("y") is None:
+                continue
+            latest_point = point
+        if latest_point is None:
+            continue
+
+        key = str(name)
+        latest[key] = latest_point.get("y")
+        if latest_point.get("x") not in (None, ""):
+            timestamps[f"{key}_timestamp"] = latest_point.get("x")
+
+    latest.update(timestamps)
+    return latest
+
+
+def _find_time_series_mapping(payload: Any) -> Mapping[str, Any] | None:
+    """Find a named timeSeries mapping recursively."""
+    if not isinstance(payload, Mapping):
+        return None
+
+    data = payload.get("data")
+    if isinstance(data, Mapping):
+        ts = data.get("timeSeries") or data.get("timeseries") or data.get("time_series")
+        if isinstance(ts, Mapping):
+            return ts
+
+    ts = payload.get("timeSeries") or payload.get("timeseries") or payload.get("time_series")
+    if isinstance(ts, Mapping):
+        return ts
+
+    for value in payload.values():
+        if isinstance(value, Mapping):
+            found = _find_time_series_mapping(value)
+            if found:
+                return found
+    return None
 
 
 def _find_telemetry_rows(payload: Any) -> list[Mapping[str, Any]]:
@@ -293,10 +361,17 @@ def _telemetry_summary(payloads: Mapping[str, Any]) -> dict[str, Any]:
     for name, payload in payloads.items():
         rows = _find_telemetry_rows(payload)
         latest = _latest_telemetry_row(payload)
+        time_series = _find_time_series_mapping(payload)
+        series_counts: dict[str, int] = {}
+        if time_series:
+            for series_name, points in time_series.items():
+                if isinstance(points, list):
+                    series_counts[str(series_name)] = len(points)
         summary[name] = {
             "rows": len(rows),
+            "series": series_counts,
             "latest": compact_attributes(latest),
-            "available": bool(rows or payload),
+            "available": bool(rows or time_series or payload),
         }
     return summary
 

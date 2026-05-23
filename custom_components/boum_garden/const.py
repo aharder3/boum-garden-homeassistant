@@ -8,7 +8,7 @@ from homeassistant.const import Platform
 DOMAIN = "boum_garden"
 NAME = "Boum Garden"
 MANUFACTURER = "Boum"
-VERSION = "0.2.5"
+VERSION = "0.2.7"
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.BUTTON]
 

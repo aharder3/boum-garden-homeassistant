@@ -168,6 +168,7 @@ class BoumGardenOptionsFlow(config_entries.OptionsFlow):
                 self._config_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS),
             )
         )
+        options = self._config_entry.options
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
@@ -177,25 +178,41 @@ class BoumGardenOptionsFlow(config_entries.OptionsFlow):
                     ),
                     vol.Optional(
                         CONF_PLANT_NAME,
-                        default=self._config_entry.options.get(CONF_PLANT_NAME, ""),
+                        default=options.get(CONF_PLANT_NAME, ""),
                     ): str,
                     vol.Optional(
                         CONF_PLANT_LOCATION,
-                        default=self._config_entry.options.get(CONF_PLANT_LOCATION, ""),
+                        default=options.get(CONF_PLANT_LOCATION, ""),
                     ): str,
                     vol.Optional(
                         CONF_PLANT_ICON,
-                        default=self._config_entry.options.get(CONF_PLANT_ICON, "mdi:sprout"),
+                        default=options.get(CONF_PLANT_ICON, "mdi:sprout"),
                     ): str,
                     vol.Optional(
                         CONF_PLANTS_JSON,
-    CONF_TANK_EMPTY_DISTANCE_CM,
-    CONF_TANK_FULL_DISTANCE_CM,
-    CONF_TANK_VOLUME_LITERS,
-                        default=self._config_entry.options.get(CONF_PLANTS_JSON, ""),
+                        default=options.get(CONF_PLANTS_JSON, ""),
                     ): TextSelector(TextSelectorConfig(multiline=True)),
+                    vol.Optional(
+                        CONF_TANK_VOLUME_LITERS,
+                        default=str(options.get(CONF_TANK_VOLUME_LITERS, "")),
+                    ): str,
+                    vol.Optional(
+                        CONF_TANK_EMPTY_DISTANCE_CM,
+                        default=str(options.get(CONF_TANK_EMPTY_DISTANCE_CM, "")),
+                    ): str,
+                    vol.Optional(
+                        CONF_TANK_FULL_DISTANCE_CM,
+                        default=str(options.get(CONF_TANK_FULL_DISTANCE_CM, "")),
+                    ): str,
                 }
             ),
+            description_placeholders={
+                "tank_help": (
+                    "Use the main Boum tank volume, not the 2 L pot reservoir. "
+                    "Known Boum tanks are 32 L (small) and 35 L (large). "
+                    "Water level is calculated only when Boum exposes a distance in cm."
+                )
+            },
         )
 
 

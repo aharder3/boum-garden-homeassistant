@@ -156,13 +156,21 @@
         "name": "Water tank"
       },
       "water_tank_liters": {
-        "name": "Water fill level"
+        "name": "Water level"
       },
       "battery_telemetry": {
         "name": "Battery"
       },
       "energy_saving_mode": {
         "name": "Power saving mode"
+      },
+      "water_distance": {
+        "name": "Water distance",
+        "state": {}
+      },
+      "water_liters_direct": {
+        "name": "Direct water level",
+        "state": {}
       }
     },
     "switch": {
