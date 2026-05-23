@@ -260,6 +260,14 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
         source_order=("desired", "reported", "telemetry"),
     ),
     BoumValueSensorDescription(
+        key="refill_time",
+        translation_key="refill_time",
+        keys=("refillTime", "refill_time"),
+        value_type="string",
+        icon="mdi:clock-time-seven-outline",
+        source_order=("desired", "reported", "telemetry"),
+    ),
+    BoumValueSensorDescription(
         key="daily_refill_1",
         translation_key="daily_refill_1",
         keys=("dailyRefill", "daily_refill"),
@@ -362,6 +370,8 @@ DYNAMIC_SKIP_KEYS = {
     "preview",
     "length",
     "truncated",
+    "x",
+    "y",
 }
 SENSITIVE_PATH_TOKENS = (
     "token",
@@ -414,6 +424,7 @@ async def async_setup_entry(
         for plant_entity in _plant_entities_for_device(coordinator, device_id, device):
             entities.append(plant_entity)
         entities.append(BoumDerivedLastWateredSensor(coordinator, device_id))
+        entities.append(BoumNextRefillSensor(coordinator, device_id))
         entities.append(BoumPumpSyncSensor(coordinator, device_id))
         sources = _sources(device)
 
@@ -586,13 +597,13 @@ class BoumDerivedLastWateredSensor(BoumBaseSensor):
     def native_value(self) -> Any:
         if not self._device:
             return None
-        return self._best_value()[0]
+        return _global_last_watered_for_device(self._device)[0]
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         if not self._device:
             return {}
-        value, source, confidence, note = self._best_value()
+        value, source, confidence, note = _global_last_watered_for_device(self._device)
         local = self._device.get("_local", {}) if isinstance(self._device.get("_local"), Mapping) else {}
         derived = self._device.get("_derived", {}) if isinstance(self._device.get("_derived"), Mapping) else {}
         sources = _sources(self._device)
@@ -609,35 +620,65 @@ class BoumDerivedLastWateredSensor(BoumBaseSensor):
             "last_pump_command_at": local.get("last_pump_command_at"),
         }
 
-    def _best_value(self) -> tuple[Any, str | None, str | None, str | None]:
-        if not self._device:
-            return None, None, None, None
-        sources = _sources(self._device)
-        api_raw = _find_known_value(sources, LAST_WATERING_KEYS, ("reported", "telemetry", "desired"))
-        api_value = as_timestamp(api_raw)
-        if api_value is not None:
-            return api_value, "api", "direct", "Boum exposed a direct last-watered/last-pumped value."
 
-        derived = self._device.get("_derived", {}) if isinstance(self._device.get("_derived"), Mapping) else {}
-        derived_value = as_timestamp(derived.get("last_watered"))
-        if derived_value is not None:
-            return (
-                derived_value,
-                str(derived.get("last_watered_source") or "derived"),
-                str(derived.get("last_watered_confidence") or "derived"),
-                str(derived.get("last_watered_note") or "Derived from telemetry or Home Assistant pump action."),
-            )
+def _global_last_watered_for_device(device: Mapping[str, Any]) -> tuple[Any, str | None, str | None, str | None]:
+    """Return best known device-level watering timestamp."""
+    sources = _sources(device)
+    api_raw = _find_known_value(sources, LAST_WATERING_KEYS, ("reported", "telemetry", "desired"))
+    api_value = as_timestamp(api_raw)
+    if api_value is not None:
+        return api_value, "api", "direct", "Boum exposed a direct last-watered/last-pumped value."
 
-        local = self._device.get("_local", {}) if isinstance(self._device.get("_local"), Mapping) else {}
-        local_value = as_timestamp(local.get("last_watered"))
-        if local_value is not None:
-            return (
-                local_value,
-                str(local.get("last_watered_source") or "home_assistant"),
-                "local",
-                "Home Assistant recorded the pump being switched on.",
-            )
-        return None, None, None, "No API, telemetry or local pump event is available yet."
+    derived = device.get("_derived", {}) if isinstance(device.get("_derived"), Mapping) else {}
+    derived_value = as_timestamp(derived.get("last_watered"))
+    if derived_value is not None:
+        return (
+            derived_value,
+            str(derived.get("last_watered_source") or "derived"),
+            str(derived.get("last_watered_confidence") or "derived"),
+            str(derived.get("last_watered_note") or "Derived from telemetry or Home Assistant pump action."),
+        )
+
+    local = device.get("_local", {}) if isinstance(device.get("_local"), Mapping) else {}
+    local_value = as_timestamp(local.get("last_watered"))
+    if local_value is not None:
+        return (
+            local_value,
+            str(local.get("last_watered_source") or "home_assistant"),
+            "local",
+            "Home Assistant recorded the pump being switched on.",
+        )
+    return None, None, None, "No API, telemetry or local pump event is available yet."
+
+
+def _next_refill_for_device(device: Mapping[str, Any]) -> Any:
+    """Compute the next refill time from device schedule, if possible."""
+    from datetime import datetime, timedelta
+
+    sources = _sources(device)
+    daily = _find_known_value(sources, ("dailyRefill", "daily_refill"), ("desired", "reported"))
+    if str(daily).strip().lower() in {"off", "false", "0", "no", "disabled"}:
+        return None
+
+    refill_time = _find_known_value(sources, ("refillTime", "refill_time"), ("desired", "reported"))
+    if not refill_time:
+        return None
+    match = re.search(r"(\d{1,2})[:.](\d{2})", str(refill_time))
+    if not match:
+        return None
+    hour = int(match.group(1))
+    minute = int(match.group(2))
+    if hour > 23 or minute > 59:
+        return None
+
+    now = datetime.now().astimezone()
+    candidate = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if candidate <= now:
+        interval_raw = str(_find_known_value(sources, ("refillInterval", "refill_interval"), ("desired", "reported")) or "1days")
+        interval_match = re.search(r"(\d+)", interval_raw)
+        days = int(interval_match.group(1)) if interval_match else 1
+        candidate = candidate + timedelta(days=max(days, 1))
+    return candidate
 
 
 class BoumPlantSummarySensor(BoumBaseSensor):
@@ -755,6 +796,92 @@ class BoumApiPlantContainerSensor(BoumBaseSensor):
         if not container:
             return {}
         return compact_attributes(container)
+
+
+class BoumPlantContainerLastWateredSensor(BoumBaseSensor):
+    """Best-effort last watered timestamp for one Boum plant container.
+
+    Boum currently exposes pump/refill information on the device level. If the
+    API does not provide a per-container watering timestamp, this sensor uses the
+    global device-level derived timestamp and marks that clearly in attributes.
+    """
+
+    _attr_icon = "mdi:watering-can"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self,
+        coordinator: BoumGardenDataUpdateCoordinator,
+        device_id: str,
+        container: Mapping[str, Any],
+        index: int,
+    ) -> None:
+        super().__init__(coordinator, device_id)
+        self._container_id = str(container.get("plant_container_id") or index)
+        self._index = index
+        self._attr_unique_id = (
+            f"{DOMAIN}_{device_id}_plant_container_{_slugify(self._container_id)}_last_watered"
+        )
+        pot_name = str(container.get("pot_name") or f"Pflanzcontainer {index:02d}")
+        self._attr_name = f"{pot_name} zuletzt bewässert"
+
+    @property
+    def native_value(self) -> Any:
+        if not self._device:
+            return None
+        value, _source, _confidence, _note = _global_last_watered_for_device(self._device)
+        return value
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        container = _find_current_container(self._device or {}, self._container_id)
+        value, source, confidence, note = _global_last_watered_for_device(self._device or {})
+        return compact_attributes(
+            {
+                "plant_container_id": self._container_id,
+                "pot_name": container.get("pot_name") if container else None,
+                "plant_names": container.get("plant_names") if container else None,
+                "source": source,
+                "confidence": confidence,
+                "global_device_last_watered": value,
+                "note": (
+                    "Boum API data currently exposes pump/refill history at device level. "
+                    "This value is therefore a best-effort device-level watering timestamp "
+                    "assigned to the pot, not a proven per-pot measurement. "
+                    + (note or "")
+                ),
+            }
+        )
+
+
+class BoumNextRefillSensor(BoumBaseSensor):
+    """Next scheduled refill/watering based on Boum desired/reported schedule."""
+
+    _attr_icon = "mdi:calendar-clock"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_name = "Nächste Bewässerung"
+
+    def __init__(self, coordinator: BoumGardenDataUpdateCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{DOMAIN}_{device_id}_next_refill"
+
+    @property
+    def native_value(self) -> Any:
+        if not self._device:
+            return None
+        return _next_refill_for_device(self._device)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        if not self._device:
+            return {}
+        sources = _sources(self._device)
+        return {
+            "refill_time": _find_known_value(sources, ("refillTime", "refill_time"), ("desired", "reported")),
+            "refill_interval": _find_known_value(sources, ("refillInterval", "refill_interval"), ("desired", "reported")),
+            "daily_refill": _find_known_value(sources, ("dailyRefill", "daily_refill"), ("desired", "reported")),
+            "note": "Computed locally from Boum refillTime/refillInterval/dailyRefill.",
+        }
 
 
 class BoumApiPlantSensor(BoumBaseSensor):
@@ -1040,10 +1167,11 @@ def _plant_entities_for_device(
     """
     containers = _api_plant_containers_for_device(device)
     if containers:
-        return [
-            BoumApiPlantContainerSensor(coordinator, device_id, container, index)
-            for index, container in enumerate(containers, start=1)
-        ]
+        entities: list[SensorEntity] = []
+        for index, container in enumerate(containers, start=1):
+            entities.append(BoumApiPlantContainerSensor(coordinator, device_id, container, index))
+            entities.append(BoumPlantContainerLastWateredSensor(coordinator, device_id, container, index))
+        return entities
 
     # Fallback for payload shapes that expose plants but not container IDs.
     plants = _api_plants_for_device(device)
@@ -1179,6 +1307,8 @@ def _api_plant_containers_for_device(device: Mapping[str, Any]) -> list[dict[str
                 "temperature_care": _care_by_plant(items, "temperature_care"),
                 "fertilizer_care": _care_by_plant(items, "fertilizer_care"),
                 "source": "api_user_plants",
+                "last_watered_source": None,
+                "last_watered_note": "Set at runtime from the device-level watering timestamp.",
                 "dashboard_hint": "One entity represents one Boum plantContainerId/pot. Multiple plants are listed in the plants attribute.",
             }
         )

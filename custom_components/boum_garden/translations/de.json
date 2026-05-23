@@ -148,6 +148,9 @@
       },
       "last_watered_derived": {
         "name": "Zuletzt getränkt abgeleitet"
+      },
+      "refill_time": {
+        "name": "Nachfüllzeit"
       }
     },
     "switch": {

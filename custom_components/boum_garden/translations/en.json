@@ -148,6 +148,9 @@
       },
       "last_watered_derived": {
         "name": "Last watered derived"
+      },
+      "refill_time": {
+        "name": "Refill time"
       }
     },
     "switch": {

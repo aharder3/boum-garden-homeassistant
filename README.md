@@ -194,7 +194,7 @@ Plant names and plant care metadata are read from the Boum user API. The integra
 
 ## Dashboard
 
-Ab Version 0.2.0 erstellt die Integration pro Boum-`plantContainerId` eine eigene Topf-Entität. Wenn mehrere Pflanzen im selben Topf sind, erscheinen sie in **einer** Entität und nicht als mehrere Töpfe. Zusätzlich gibt es den Sensor **Pflanztopf Tabelle** mit den Attributen `rows`, `containers` und `markdown_table`.
+Ab Version 0.2.1 erstellt die Integration pro Boum-`plantContainerId` eine eigene Topf-Entität. Wenn mehrere Pflanzen im selben Topf sind, erscheinen sie in **einer** Entität und nicht als mehrere Töpfe. Zusätzlich gibt es den Sensor **Pflanztopf Tabelle** mit den Attributen `rows`, `containers` und `markdown_table`.
 
 Ein Beispiel-Dashboard liegt hier:
 
@@ -204,10 +204,20 @@ Ein Beispiel-Dashboard liegt hier:
 
 Die dynamischen Karten nutzen `custom:auto-entities` und Mushroom Cards. Die Markdown-Tabelle kann auch ohne Mushroom verwendet werden, sofern du die Entity-ID des Sensors **Pflanztopf Tabelle** einsetzt.
 
-## 0.2.0
+## 0.2.1
 
 - Pro `plantContainerId` wird jetzt genau eine Pflanztopf-Entität erstellt.
 - Mehrere Pflanzen pro Topf werden als Pflanzenliste und Detailattribute zusammengeführt.
 - Neuer Sensor **Pflanztopf Tabelle** mit `rows`, `containers` und `markdown_table`.
 - Aggregierte Topf-Infos: Pflanzenanzahl, Pflanzennamen, Wasserbedarf, Wasserklasse, Lichtbedarf, Erde, Nährstoffe, Temperaturbereich, Bilder und Pflegehinweise.
 - Beispiel-Dashboard für Lovelace ergänzt.
+
+
+## Version 0.2.1
+
+- Added one derived “last watered” timestamp entity per plant container.
+- Added “Nächste Bewässerung” derived from `refillTime`, `refillInterval` and `dailyRefill`.
+- Suppressed low-value telemetry `x`/`y` dynamic sensors and fixed plain `refillTime` as a readable string sensor.
+- Updated the included Sections dashboard snippet to use only Boum Garden entities and show pot-based watering information.
+
+Note: Boum currently exposes pump/refill information at device level in the available API payload. Per-pot last watering is therefore best-effort and based on the device/global pump/refill timestamp unless Boum exposes per-container history in future.
