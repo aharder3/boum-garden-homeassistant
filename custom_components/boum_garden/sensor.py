@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import json
 from dataclasses import dataclass
 import re
 from typing import Any
@@ -18,7 +19,16 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DATA_COORDINATOR, DOMAIN
+from .const import (
+    CONF_PLANT_ICON,
+    CONF_PLANT_LOCATION,
+    CONF_PLANT_NAME,
+    CONF_PLANTS_JSON,
+    DATA_COORDINATOR,
+    DEFAULT_LOCAL_PLANTS,
+    DEFAULT_PLANT_CONTAINER_NAMES,
+    DOMAIN,
+)
 from .coordinator import BoumGardenDataUpdateCoordinator
 from .helpers import (
     as_float,
@@ -400,7 +410,11 @@ async def async_setup_entry(
 
     for device_id, device in coordinator.data.items():
         entities.append(BoumDeviceOverviewSensor(coordinator, device_id))
+        entities.append(BoumConfiguredPlantSensor(coordinator, device_id))
         entities.append(BoumPlantSummarySensor(coordinator, device_id))
+        for plant_entity in _plant_entities_for_device(coordinator, device_id, device):
+            entities.append(plant_entity)
+        entities.append(BoumDerivedLastWateredSensor(coordinator, device_id))
         entities.append(BoumPumpSyncSensor(coordinator, device_id))
         sources = _sources(device)
 
@@ -470,7 +484,7 @@ class BoumDeviceOverviewSensor(BoumBaseSensor):
     def extra_state_attributes(self) -> dict[str, Any]:
         if not self._device:
             return {}
-        plants = _extract_plants(self._device)
+        plants = _api_plants_for_device(self._device) or _extract_plants(self._device)
         return {
             "device_id": device_id_from_device(self._device),
             "name": device_name(self._device),
@@ -504,6 +518,129 @@ class BoumDeviceOverviewSensor(BoumBaseSensor):
         }
 
 
+class BoumConfiguredPlantSensor(BoumBaseSensor):
+    """Locally configured plant name/location when Boum does not expose plants."""
+
+    _attr_translation_key = "configured_plant"
+    _attr_icon = "mdi:sprout"
+
+    def __init__(self, coordinator: BoumGardenDataUpdateCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{DOMAIN}_{device_id}_configured_plant"
+
+    @property
+    def icon(self) -> str:
+        icon = str(self.coordinator.options.get(CONF_PLANT_ICON) or "").strip()
+        return icon if icon.startswith("mdi:") else "mdi:sprout"
+
+    @property
+    def native_value(self) -> str | None:
+        local_plants = _local_plants_for_device(self.coordinator.options, self._device or {})
+        if local_plants:
+            names = [str(plant.get("name")) for plant in local_plants if plant.get("name")]
+            return ", ".join(names) if names else None
+        name = str(self.coordinator.options.get(CONF_PLANT_NAME) or "").strip()
+        if name:
+            return name
+        plants = (_api_plants_for_device(self._device or {}) or _extract_plants(self._device or {})) if self._device else []
+        if plants and plants[0].get("name"):
+            return str(plants[0]["name"])
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        if not self._device:
+            return {}
+        local_plants = _local_plants_for_device(self.coordinator.options, self._device)
+        return {
+            "configured_in_home_assistant": bool(
+                local_plants or str(self.coordinator.options.get(CONF_PLANT_NAME) or "").strip()
+            ),
+            "location": str(self.coordinator.options.get(CONF_PLANT_LOCATION) or "").strip() or None,
+            "icon": self.icon,
+            "local_plants": compact_attributes(local_plants),
+            "api_plant_names": [
+                plant.get("name")
+                for plant in (_api_plants_for_device(self._device) or _extract_plants(self._device))
+                if plant.get("name")
+            ],
+            "note": (
+                "If Boum does not expose plant names through the API, this sensor uses "
+                "the locally configured Home Assistant options. Multiple plants can be "
+                "configured as JSON in the integration options."
+            ),
+        }
+
+
+class BoumDerivedLastWateredSensor(BoumBaseSensor):
+    """Best-effort last watered timestamp derived from API, telemetry or HA actions."""
+
+    _attr_translation_key = "last_watered_derived"
+    _attr_icon = "mdi:watering-can"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, coordinator: BoumGardenDataUpdateCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{DOMAIN}_{device_id}_last_watered_derived"
+
+    @property
+    def native_value(self) -> Any:
+        if not self._device:
+            return None
+        return self._best_value()[0]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        if not self._device:
+            return {}
+        value, source, confidence, note = self._best_value()
+        local = self._device.get("_local", {}) if isinstance(self._device.get("_local"), Mapping) else {}
+        derived = self._device.get("_derived", {}) if isinstance(self._device.get("_derived"), Mapping) else {}
+        sources = _sources(self._device)
+        api_raw = _find_known_value(sources, LAST_WATERING_KEYS, ("reported", "telemetry", "desired"))
+        return {
+            "source": source,
+            "confidence": confidence,
+            "note": note,
+            "api_raw_value": api_raw,
+            "derived_value": derived.get("last_watered"),
+            "derived_source": derived.get("last_watered_source"),
+            "local_last_watered": local.get("last_watered"),
+            "last_pump_command": local.get("last_pump_command"),
+            "last_pump_command_at": local.get("last_pump_command_at"),
+        }
+
+    def _best_value(self) -> tuple[Any, str | None, str | None, str | None]:
+        if not self._device:
+            return None, None, None, None
+        sources = _sources(self._device)
+        api_raw = _find_known_value(sources, LAST_WATERING_KEYS, ("reported", "telemetry", "desired"))
+        api_value = as_timestamp(api_raw)
+        if api_value is not None:
+            return api_value, "api", "direct", "Boum exposed a direct last-watered/last-pumped value."
+
+        derived = self._device.get("_derived", {}) if isinstance(self._device.get("_derived"), Mapping) else {}
+        derived_value = as_timestamp(derived.get("last_watered"))
+        if derived_value is not None:
+            return (
+                derived_value,
+                str(derived.get("last_watered_source") or "derived"),
+                str(derived.get("last_watered_confidence") or "derived"),
+                str(derived.get("last_watered_note") or "Derived from telemetry or Home Assistant pump action."),
+            )
+
+        local = self._device.get("_local", {}) if isinstance(self._device.get("_local"), Mapping) else {}
+        local_value = as_timestamp(local.get("last_watered"))
+        if local_value is not None:
+            return (
+                local_value,
+                str(local.get("last_watered_source") or "home_assistant"),
+                "local",
+                "Home Assistant recorded the pump being switched on.",
+            )
+        return None, None, None, "No API, telemetry or local pump event is available yet."
+
+
 class BoumPlantSummarySensor(BoumBaseSensor):
     """Plant summary sensor."""
 
@@ -519,18 +656,70 @@ class BoumPlantSummarySensor(BoumBaseSensor):
     def native_value(self) -> int | None:
         if not self._device:
             return None
-        return len(_extract_plants(self._device))
+        api_plants = _api_plants_for_device(self._device)
+        extracted_plants = _extract_plants(self._device)
+        local_plants = _local_plants_for_device(self.coordinator.options, self._device)
+        return len(api_plants or local_plants or extracted_plants)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         if not self._device:
             return {}
-        plants = _extract_plants(self._device)
+        api_plants = _api_plants_for_device(self._device)
+        extracted_plants = _extract_plants(self._device)
+        local_plants = _local_plants_for_device(self.coordinator.options, self._device)
+        plants = api_plants or local_plants or extracted_plants
         return {
             "names": [plant.get("name") for plant in plants if plant.get("name")],
+            "containers": _plant_container_summary(plants),
             "plants": compact_attributes(plants),
-            "note": "0 means no plant objects/names were returned by the API payloads currently fetched.",
+            "source": "api_user_plants" if api_plants else ("local_options" if local_plants else "api_device_payload"),
+            "api_names": [plant.get("name") for plant in api_plants if plant.get("name")],
+            "note": (
+                "Uses Boum app plant assignments from the user API when available. "
+                "If the API does not expose plants, the local JSON mapping from the "
+                "integration options is used."
+            ),
         }
+
+
+
+class BoumApiPlantSensor(BoumBaseSensor):
+    """One sensor per Boum app plant assignment."""
+
+    _attr_icon = "mdi:sprout"
+
+    def __init__(
+        self,
+        coordinator: BoumGardenDataUpdateCoordinator,
+        device_id: str,
+        plant: Mapping[str, Any],
+        index: int,
+    ) -> None:
+        super().__init__(coordinator, device_id)
+        self._plant_uid = str(plant.get("id") or plant.get("plantId") or index)
+        self._index = index
+        self._attr_unique_id = f"{DOMAIN}_{device_id}_plant_{_slugify(self._plant_uid)}"
+        pot = _plant_pot_name(plant)
+        name = _plant_display_name(plant) or f"Pflanze {index}"
+        self._attr_name = f"{pot} {name}" if pot else name
+        self._attr_icon = _plant_icon(plant)
+
+    @property
+    def native_value(self) -> str | None:
+        plant = _find_current_plant(self._device or {}, self._plant_uid)
+        if not plant:
+            return None
+        return _plant_display_name(plant)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        plant = _find_current_plant(self._device or {}, self._plant_uid)
+        if not plant:
+            return {}
+        attrs = _plant_attributes(plant)
+        return compact_attributes(attrs)
+
 
 
 class BoumPumpSyncSensor(BoumBaseSensor):
@@ -763,6 +952,219 @@ def _source_mapping(device: Mapping[str, Any], source: str) -> Any:
         "telemetry_last_7d": device.get("_latest_telemetry_last_7d", {}),
     }.get(source, {})
 
+
+
+def _plant_entities_for_device(
+    coordinator: BoumGardenDataUpdateCoordinator,
+    device_id: str,
+    device: Mapping[str, Any],
+) -> list[BoumApiPlantSensor]:
+    """Create one entity per Boum app plant if the user API exposes plants."""
+    plants = _api_plants_for_device(device)
+    return [BoumApiPlantSensor(coordinator, device_id, plant, index) for index, plant in enumerate(plants, start=1)]
+
+
+def _api_plants_for_device(device: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Return API plants normalised for Home Assistant attributes."""
+    raw = device.get("_api_plants")
+    if not isinstance(raw, list):
+        return []
+    plants: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, item in enumerate(raw, start=1):
+        if not isinstance(item, Mapping):
+            continue
+        plant = _normalise_api_plant(item, index)
+        key = str(plant.get("id") or plant.get("plant_id") or plant.get("name") or index)
+        if key in seen:
+            continue
+        seen.add(key)
+        plants.append(plant)
+    plants.sort(key=lambda plant: (str(plant.get("pot_name") or ""), int(plant.get("index") or 0)))
+    return plants
+
+
+def _normalise_api_plant(plant: Mapping[str, Any], index: int) -> dict[str, Any]:
+    """Convert a raw Boum plant object to compact, useful attributes."""
+    translated = plant.get("translated") if isinstance(plant.get("translated"), Mapping) else {}
+    name_translated = plant.get("nameTranslated") if isinstance(plant.get("nameTranslated"), Mapping) else {}
+    name = (
+        name_translated.get("de")
+        or translated.get("de")
+        or plant.get("name")
+        or plant.get("latinName")
+        or plant.get("plantId")
+    )
+    container_id = plant.get("plantContainerId")
+    pot_name = DEFAULT_PLANT_CONTAINER_NAMES.get(str(container_id), str(container_id or ""))
+    result: dict[str, Any] = {
+        "name": str(name) if name is not None else None,
+        "pot_name": pot_name or None,
+        "plant_container_id": str(container_id) if container_id else None,
+        "plant_id": plant.get("plantId"),
+        "id": plant.get("id") or plant.get("objectID") or plant.get("plantId"),
+        "state": plant.get("state"),
+        "latin_name": plant.get("latinName"),
+        "product_name": plant.get("name"),
+        "image_url": plant.get("imageUrl"),
+        "water_usage": plant.get("waterUsage"),
+        "water_class": plant.get("waterClass"),
+        "water": _translated_value(plant, "waterTranslated", plant.get("water")),
+        "light": _translated_value(plant, "lightTypeTranslated", plant.get("lightType")),
+        "soil": _translated_value(plant, "soilTypeTranslated", plant.get("soilType")),
+        "nutrients": _translated_value(plant, "nutrientsTranslated", plant.get("nutrients")),
+        "min_temperature": plant.get("minTemperature"),
+        "max_temperature": plant.get("maxTemperature"),
+        "min_prefered_temperature": plant.get("minPreferedTemperature"),
+        "max_prefered_temperature": plant.get("maxPreferedTemperature"),
+        "fertilizer_interval_days": plant.get("fertilizerInterval"),
+        "height": plant.get("height"),
+        "width": plant.get("width"),
+        "is_boum_plant": plant.get("isBoumPlant"),
+        "is_pot_plant": plant.get("isPotPlant"),
+        "is_perennial": plant.get("isPerennial"),
+        "source": "api_user_plants",
+        "index": index,
+    }
+    descriptions = {
+        "description": _translated_value(plant, "descriptionTranslated", plant.get("description")),
+        "general_care": _translated_value(plant, "generalCareDescriptionTranslated", plant.get("generalCareDescription")),
+        "water_care": _translated_value(plant, "waterCareDescriptionTranslated", plant.get("waterCareDescription")),
+        "light_care": _translated_value(plant, "lightCareDescriptionTranslated", plant.get("lightCareDescription")),
+        "temperature_care": _translated_value(plant, "temperatureCareDescriptionTranslated", plant.get("temperatureCareDescription")),
+        "fertilizer_care": _translated_value(plant, "fertilizerCareDescriptionTranslated", plant.get("fertilizerCareDescription")),
+    }
+    for key, value in descriptions.items():
+        if isinstance(value, str) and len(value) > 900:
+            result[key] = value[:897] + "..."
+        elif value not in (None, ""):
+            result[key] = value
+    return {key: value for key, value in result.items() if value not in (None, "", [], {})}
+
+
+def _translated_value(plant: Mapping[str, Any], key: str, fallback: Any = None) -> Any:
+    value = plant.get(key)
+    if isinstance(value, Mapping):
+        return value.get("de") or value.get("en") or next((v for v in value.values() if v), fallback)
+    return fallback
+
+
+def _plant_display_name(plant: Mapping[str, Any]) -> str | None:
+    return str(plant.get("name")) if plant.get("name") not in (None, "") else None
+
+
+def _plant_pot_name(plant: Mapping[str, Any]) -> str | None:
+    return str(plant.get("pot_name")) if plant.get("pot_name") not in (None, "") else None
+
+
+def _plant_icon(plant: Mapping[str, Any]) -> str:
+    name = _normalise_key(str(plant.get("name") or ""))
+    if "erdbeere" in name:
+        return "mdi:fruit-cherries"
+    if any(token in name for token in ("basilikum", "minze", "zitronenmelisse", "zitronenverbene")):
+        return "mdi:leaf"
+    if any(token in name for token in ("rosmarin", "oregano", "thymian", "majoran", "salbei", "estragon", "koriander", "petersilie")):
+        return "mdi:sprout"
+    return "mdi:sprout"
+
+
+def _plant_attributes(plant: Mapping[str, Any]) -> dict[str, Any]:
+    return dict(plant)
+
+
+def _find_current_plant(device: Mapping[str, Any], plant_uid: str) -> dict[str, Any] | None:
+    for plant in _api_plants_for_device(device):
+        if str(plant.get("id") or plant.get("plant_id")) == str(plant_uid):
+            return plant
+    return None
+
+
+def _plant_container_summary(plants: list[dict[str, Any]]) -> dict[str, list[str]]:
+    summary: dict[str, list[str]] = {}
+    for plant in plants:
+        pot = str(plant.get("pot_name") or plant.get("plant_container_id") or "unknown")
+        name = plant.get("name")
+        if name:
+            summary.setdefault(pot, []).append(str(name))
+    return summary
+
+
+
+def _local_plants_for_device(options: Mapping[str, Any], device: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Return locally configured plants for this device from options JSON."""
+    raw = str(options.get(CONF_PLANTS_JSON) or "").strip()
+    parsed: Any = None
+    if raw:
+        try:
+            parsed = json.loads(raw)
+        except (TypeError, ValueError):
+            parsed = None
+
+    candidates = [
+        str(device_id_from_device(device) or "").strip(),
+        str(device_name(device) or "").strip(),
+        str(device.get("name") or "").strip(),
+        str(device.get("label") or "").strip(),
+        str(device.get("deviceName") or "").strip(),
+        str(device.get("title") or "").strip(),
+        "default",
+    ]
+    candidates = [item for item in candidates if item]
+
+    value: Any = None
+    if isinstance(parsed, Mapping):
+        lower_map = {str(key).lower(): val for key, val in parsed.items()}
+        for candidate in candidates:
+            if candidate in parsed:
+                value = parsed[candidate]
+                break
+            lowered = candidate.lower()
+            if lowered in lower_map:
+                value = lower_map[lowered]
+                break
+    elif isinstance(parsed, list):
+        value = parsed
+
+    # Fallback: Arthur's known Boum app mapping. This is only used when the
+    # Boum API does not expose plant names and no custom JSON option was set.
+    if value is None:
+        lower_defaults = {str(key).lower(): val for key, val in DEFAULT_LOCAL_PLANTS.items()}
+        for candidate in candidates:
+            if candidate in DEFAULT_LOCAL_PLANTS:
+                value = DEFAULT_LOCAL_PLANTS[candidate]
+                break
+            lowered = candidate.lower()
+            if lowered in lower_defaults:
+                value = lower_defaults[lowered]
+                break
+
+    plants: list[dict[str, Any]] = []
+    if isinstance(value, str):
+        value = [name.strip() for name in value.split(",") if name.strip()]
+    if isinstance(value, list):
+        for index, item in enumerate(value, start=1):
+            if isinstance(item, Mapping):
+                plant = dict(item)
+                if plant.get("name"):
+                    plant.setdefault("source", "local_options" if raw else "built_in_mapping")
+                    plant.setdefault("index", index)
+                    plants.append(plant)
+            elif isinstance(item, str) and item.strip():
+                plants.append({"name": item.strip(), "source": "local_options" if raw else "built_in_mapping", "index": index})
+
+    if not plants:
+        legacy_name = str(options.get(CONF_PLANT_NAME) or "").strip()
+        if legacy_name:
+            plants.append(
+                {
+                    "name": legacy_name,
+                    "location": str(options.get(CONF_PLANT_LOCATION) or "").strip() or None,
+                    "icon": str(options.get(CONF_PLANT_ICON) or "mdi:sprout").strip() or "mdi:sprout",
+                    "source": "local_options",
+                    "index": 1,
+                }
+            )
+    return plants
 
 def _extract_plants(device: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Extract plant-like objects from the payloads Boum exposes, if any."""

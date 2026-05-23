@@ -24,6 +24,19 @@ Large telemetry series are **not** stored as full entity attributes to avoid blo
 
 ## Features
 
+### Derived/local values
+
+Boum does not always expose plant names or a direct `last watered` field through the public API.
+This integration therefore provides a best-effort derived sensor:
+
+- direct API value first, when fields such as `lastPumped` / `lastWatered` exist
+- otherwise the latest telemetry row that indicates active pumping or flow
+- otherwise the timestamp recorded locally when the Home Assistant pump switch was turned on
+
+You can also configure a local plant name, location and MDI icon in the integration options.
+These values are stored in Home Assistant and are used only when Boum does not expose plant names.
+
+
 - Config Flow setup from the Home Assistant UI
 - Password field is hidden during setup
 - Password is not stored after login
@@ -151,8 +164,25 @@ The full raw payload is available via Home Assistant diagnostics. If the plant n
 If Boum exposes plant objects such as `plants[0].moisture`, they should appear in the plant summary and as dynamic sensors after a Home Assistant restart/reload. If a new field only appears later, reload the integration so Home Assistant can create the new entity.
 
 
-## 0.1.4
+## 0.1.8
 
 - Fix Home Assistant 2026 OptionsFlow compatibility.
 - Fix sensor platform import error caused by `_normalise_key` initialisation order.
 - Broaden pump-state aliases and keep old/invalid timestamps out of entity states.
+
+
+## Built-in lokale Pflanzen-Zuordnung
+
+Wenn die Boum API keine Pflanzennamen liefert, nutzt die Integration als Fallback Arthurs bekannte Topf-Zuordnung:
+
+- Pflanztopf 01: Zitronenmelisse, Basilikum
+- Pflanztopf 02: Minze, Zitronenverbene
+- Pflanztopf 03: Oregano, Salbei
+- Pflanztopf 04: Rosmarin, Oregano
+- Pflanztopf 05: Thymian, Estragon
+- Pflanztopf 06: Garten-Petersilie, Koriander
+- Pflanztopf 07: Majoran
+- Pflanztopf 08: Wald-Erdbeere
+- Pflanztopf 09: Garten-Petersilie
+
+Diese Zuordnung kann in den Integrationsoptionen über das JSON-Feld überschrieben werden.

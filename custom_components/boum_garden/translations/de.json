@@ -35,8 +35,13 @@
       "init": {
         "title": "Boum Garden Optionen",
         "data": {
-          "scan_interval": "Abfrageintervall in Sekunden"
-        }
+          "scan_interval": "Abfrageintervall in Sekunden",
+          "plant_name": "Pflanzenname lokal (optional)",
+          "plant_location": "Standort / Bereich lokal (optional)",
+          "plant_icon": "Icon lokal, z. B. mdi:sprout",
+          "plants_json": "Mehrere Pflanzen lokal als JSON (optional)"
+        },
+        "description": "Optionale lokale Angaben werden verwendet, wenn Boum Pflanzennamen nicht über die API liefert. Für mehrere Pflanzen pro Topf kann ein JSON-Mapping eingetragen werden, z. B. {\"Pflanztopf 02\":[{\"name\":\"Minze\"},{\"name\":\"Zitronenverbene\"}]}. „Zuletzt getränkt“ kann zusätzlich aus Telemetrie oder HA-Pumpenaktionen abgeleitet werden."
       }
     }
   },
@@ -137,6 +142,12 @@
       },
       "last_pumped_raw": {
         "name": "Zuletzt gegossen roh"
+      },
+      "configured_plant": {
+        "name": "Pflanze lokal"
+      },
+      "last_watered_derived": {
+        "name": "Zuletzt getränkt abgeleitet"
       }
     },
     "switch": {

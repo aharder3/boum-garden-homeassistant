@@ -35,8 +35,13 @@
       "init": {
         "title": "Boum Garden options",
         "data": {
-          "scan_interval": "Scan interval in seconds"
-        }
+          "scan_interval": "Scan interval in seconds",
+          "plant_name": "Local plant name (optional)",
+          "plant_location": "Local location / area (optional)",
+          "plant_icon": "Local icon, e.g. mdi:sprout",
+          "plants_json": "Multiple local plants as JSON (optional)"
+        },
+        "description": "Optional local details are used when Boum does not expose plant names through the API. For multiple plants per pot, enter a JSON mapping, for example {\"Pflanztopf 02\":[{\"name\":\"Mint\"},{\"name\":\"Lemon verbena\"}]}. Last watered can also be derived from telemetry or Home Assistant pump actions."
       }
     }
   },
@@ -137,6 +142,12 @@
       },
       "last_pumped_raw": {
         "name": "Last watered raw"
+      },
+      "configured_plant": {
+        "name": "Local plant"
+      },
+      "last_watered_derived": {
+        "name": "Last watered derived"
       }
     },
     "switch": {

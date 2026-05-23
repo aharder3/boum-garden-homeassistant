@@ -4,17 +4,26 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Mapping
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import BoumApiClient, BoumApiError
 from .const import DOMAIN
-from .helpers import compact_attributes, desired_state, device_id_from_device
+from .helpers import as_float, as_timestamp, compact_attributes, desired_state, device_id_from_device
 
 _LOGGER = logging.getLogger(__name__)
+
+STORAGE_VERSION = 1
+STORAGE_KEY = f"{DOMAIN}_local_state"
+
+PUMP_STATE_KEYS = ("pumpState", "pump_state", "pump", "pumping", "pumpOn", "pump_on", "isPumping")
+FLOW_KEYS = ("flowRate", "waterFlowRate", "minFlowRate", "flow", "waterFlow")
+TIME_KEYS = ("timestamp", "time", "createdAt", "created_at", "date", "ts")
+
 
 
 class BoumGardenDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
@@ -26,6 +35,7 @@ class BoumGardenDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict[str, 
         api: BoumApiClient,
         *,
         update_interval: timedelta,
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(
             hass,
@@ -34,8 +44,58 @@ class BoumGardenDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict[str, 
             update_interval=update_interval,
         )
         self.api = api
+        self.options = dict(options or {})
         self.user: dict[str, Any] = {}
         self.last_api_errors: dict[str, str] = {}
+        self.local_state: dict[str, dict[str, Any]] = {}
+        self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
+
+    async def async_load_local_state(self) -> None:
+        """Load locally derived Boum data from Home Assistant storage."""
+        stored = await self._store.async_load()
+        devices = stored.get("devices") if isinstance(stored, Mapping) else None
+        self.local_state = {
+            str(device_id): dict(values)
+            for device_id, values in (devices or {}).items()
+            if isinstance(values, Mapping)
+        }
+
+    async def async_record_manual_watering(self, device_id: str, *, source: str) -> None:
+        """Persist that Home Assistant triggered the pump, used as derived last watering."""
+        now = datetime.now(timezone.utc).isoformat()
+        local = dict(self.local_state.get(device_id, {}))
+        local.update(
+            {
+                "last_watered": now,
+                "last_watered_source": source,
+                "last_pump_command": "on",
+                "last_pump_command_at": now,
+            }
+        )
+        self.local_state[device_id] = local
+        await self._store.async_save({"devices": self.local_state})
+        self._apply_local_to_current_data(device_id)
+
+    async def async_record_pump_command(self, device_id: str, command: str) -> None:
+        """Persist the latest Home Assistant pump command."""
+        now = datetime.now(timezone.utc).isoformat()
+        local = dict(self.local_state.get(device_id, {}))
+        local.update({"last_pump_command": command, "last_pump_command_at": now})
+        self.local_state[device_id] = local
+        await self._store.async_save({"devices": self.local_state})
+        self._apply_local_to_current_data(device_id)
+
+    def _apply_local_to_current_data(self, device_id: str) -> None:
+        """Merge local data into coordinator data for immediate UI updates."""
+        if not self.data or device_id not in self.data:
+            return
+        data = dict(self.data)
+        device = dict(data[device_id])
+        local = self.local_state.get(device_id)
+        if local:
+            device["_local"] = dict(local)
+        data[device_id] = device
+        self.async_set_updated_data(data)
 
     async def _async_update_data(self) -> dict[str, dict[str, Any]]:
         errors: dict[str, str] = {}
@@ -48,6 +108,7 @@ class BoumGardenDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict[str, 
                 _LOGGER.debug("Could not fetch Boum user information: %s", err)
 
             claimed = await self.api.list_claimed_devices()
+            user_plants = _extract_user_plants(self.user)
 
             async def fetch_full_device(device: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
                 device_id = device_id_from_device(device)
@@ -109,11 +170,26 @@ class BoumGardenDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict[str, 
                     for payload in telemetry_payloads.values()
                     if payload is not None
                 )
+                final_device_id = device_id_from_device(full)
+                local = self.local_state.get(final_device_id)
+                if local:
+                    full["_local"] = dict(local)
+
+                derived = _derive_values_from_payloads(full, telemetry_payloads, local or {})
+                if derived:
+                    full["_derived"] = derived
+
+                # Plants returned by /users are real Boum app plant assignments.
+                # They are stored on the device payload so sensor.py can create useful entities.
+                if user_plants:
+                    full["_api_plants"] = user_plants
+                    full["_api_plant_containers"] = _group_plants_by_container(user_plants)
+
                 # User/owner data stays available in diagnostics but should not be
                 # turned into Home Assistant entities.
                 if device_errors:
                     full["_api_errors"] = device_errors
-                return device_id_from_device(full), full
+                return final_device_id, full
 
             pairs = await asyncio.gather(*(fetch_full_device(device) for device in claimed))
             self.last_api_errors = errors
@@ -135,6 +211,34 @@ class BoumGardenDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict[str, 
         data[device_id] = device
         self.async_set_updated_data(data)
 
+
+
+def _extract_user_plants(user: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Extract plant assignments returned by the Boum user endpoint."""
+    plants = user.get("plants") if isinstance(user, Mapping) else None
+    if not isinstance(plants, list):
+        return []
+    result: list[dict[str, Any]] = []
+    for index, item in enumerate(plants, start=1):
+        if not isinstance(item, Mapping):
+            continue
+        if item.get("isArchived") is True:
+            continue
+        plant = dict(item)
+        plant.setdefault("_index", index)
+        result.append(plant)
+    return result
+
+
+def _group_plants_by_container(plants: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Group plants by Boum plantContainerId."""
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for plant in plants:
+        container_id = plant.get("plantContainerId")
+        if not container_id:
+            continue
+        grouped.setdefault(str(container_id), []).append(plant)
+    return grouped
 
 def _latest_telemetry_row(payload: Any) -> dict[str, Any]:
     """Extract the latest telemetry row from common API response shapes."""
@@ -210,3 +314,92 @@ def _deep_merge(base: dict[str, Any], update: dict[str, Any]) -> dict[str, Any]:
 
 def _is_simple(value: Any) -> bool:
     return value is None or isinstance(value, (str, int, float, bool))
+
+
+def _derive_values_from_payloads(
+    device: Mapping[str, Any], telemetry_payloads: Mapping[str, Any], local: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Derive user-facing values when Boum does not expose them directly."""
+    derived: dict[str, Any] = {}
+    telemetry_last = _derive_last_watering_from_telemetry(telemetry_payloads)
+    local_last = as_timestamp(local.get("last_watered")) if local else None
+
+    candidates: list[tuple[datetime, str, str]] = []
+    if telemetry_last:
+        candidates.append((telemetry_last, "telemetry", "Pump activity/flow found in Boum telemetry."))
+    if local_last:
+        candidates.append((local_last, str(local.get("last_watered_source") or "home_assistant"), "Pump was switched on through Home Assistant."))
+
+    if candidates:
+        when, source, note = sorted(candidates, key=lambda item: item[0])[-1]
+        derived["last_watered"] = when.isoformat()
+        derived["last_watered_source"] = source
+        derived["last_watered_note"] = note
+        derived["last_watered_confidence"] = "derived"
+
+    return derived
+
+
+def _derive_last_watering_from_telemetry(payloads: Mapping[str, Any]) -> datetime | None:
+    """Find the latest telemetry row that looks like watering/pumping."""
+    latest: datetime | None = None
+    for payload in payloads.values():
+        for row in _find_telemetry_rows(payload):
+            if not _telemetry_row_indicates_watering(row):
+                continue
+            when = _row_timestamp(row)
+            if when is None:
+                continue
+            if latest is None or when > latest:
+                latest = when
+    return latest
+
+
+def _telemetry_row_indicates_watering(row: Mapping[str, Any]) -> bool:
+    """Return true if a telemetry row likely represents active watering."""
+    for key in PUMP_STATE_KEYS:
+        value = _get_case_insensitive(row, key)
+        if value is not None and _value_is_on(value):
+            return True
+
+    for key in FLOW_KEYS:
+        value = _get_case_insensitive(row, key)
+        numeric = as_float(value)
+        if numeric is not None and numeric > 0:
+            return True
+
+    return False
+
+
+def _row_timestamp(row: Mapping[str, Any]) -> datetime | None:
+    for key in TIME_KEYS:
+        value = _get_case_insensitive(row, key)
+        timestamp = as_timestamp(value)
+        if timestamp is not None:
+            return timestamp
+    return None
+
+
+def _get_case_insensitive(data: Mapping[str, Any], wanted_key: str) -> Any:
+    wanted = wanted_key.lower()
+    for key, value in data.items():
+        if str(key).lower() == wanted:
+            return value
+    return None
+
+
+def _value_is_on(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return float(value) > 0
+    return str(value).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+        "open",
+        "running",
+        "active",
+        "pumping",
+    }

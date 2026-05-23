@@ -83,10 +83,14 @@ class BoumPumpSwitch(CoordinatorEntity[BoumGardenDataUpdateCoordinator], SwitchE
         """Turn pump on."""
         await self._api.set_pump_state(self._device_id, True)
         self.coordinator.apply_local_desired_state(self._device_id, {"pumpState": "on"})
+        await self.coordinator.async_record_manual_watering(
+            self._device_id, source="home_assistant_switch"
+        )
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn pump off."""
         await self._api.set_pump_state(self._device_id, False)
         self.coordinator.apply_local_desired_state(self._device_id, {"pumpState": "off"})
+        await self.coordinator.async_record_pump_command(self._device_id, "off")
         await self.coordinator.async_request_refresh()

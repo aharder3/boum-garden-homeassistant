@@ -24,6 +24,10 @@ from .const import (
     CONF_ACCESS_TOKEN,
     CONF_BASE_URL_OVERRIDE,
     CONF_ENV,
+    CONF_PLANT_ICON,
+    CONF_PLANT_LOCATION,
+    CONF_PLANT_NAME,
+    CONF_PLANTS_JSON,
     CONF_REFRESH_TOKEN,
     CONF_SCAN_INTERVAL,
     DEFAULT_ENV,
@@ -167,7 +171,23 @@ class BoumGardenOptionsFlow(config_entries.OptionsFlow):
                 {
                     vol.Required(CONF_SCAN_INTERVAL, default=current): vol.All(
                         vol.Coerce(int), vol.Range(min=60, max=86400)
-                    )
+                    ),
+                    vol.Optional(
+                        CONF_PLANT_NAME,
+                        default=self._config_entry.options.get(CONF_PLANT_NAME, ""),
+                    ): str,
+                    vol.Optional(
+                        CONF_PLANT_LOCATION,
+                        default=self._config_entry.options.get(CONF_PLANT_LOCATION, ""),
+                    ): str,
+                    vol.Optional(
+                        CONF_PLANT_ICON,
+                        default=self._config_entry.options.get(CONF_PLANT_ICON, "mdi:sprout"),
+                    ): str,
+                    vol.Optional(
+                        CONF_PLANTS_JSON,
+                        default=self._config_entry.options.get(CONF_PLANTS_JSON, ""),
+                    ): TextSelector(TextSelectorConfig(multiline=True)),
                 }
             ),
         )
