@@ -28,6 +28,9 @@ from .const import (
     CONF_PLANT_LOCATION,
     CONF_PLANT_NAME,
     CONF_PLANTS_JSON,
+    CONF_TANK_EMPTY_DISTANCE_CM,
+    CONF_TANK_FULL_DISTANCE_CM,
+    CONF_TANK_VOLUME_LITERS,
     CONF_REFRESH_TOKEN,
     CONF_SCAN_INTERVAL,
     DEFAULT_ENV,
@@ -186,6 +189,9 @@ class BoumGardenOptionsFlow(config_entries.OptionsFlow):
                     ): str,
                     vol.Optional(
                         CONF_PLANTS_JSON,
+    CONF_TANK_EMPTY_DISTANCE_CM,
+    CONF_TANK_FULL_DISTANCE_CM,
+    CONF_TANK_VOLUME_LITERS,
                         default=self._config_entry.options.get(CONF_PLANTS_JSON, ""),
                     ): TextSelector(TextSelectorConfig(multiline=True)),
                 }

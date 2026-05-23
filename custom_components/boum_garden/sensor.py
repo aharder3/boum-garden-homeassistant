@@ -14,7 +14,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, UnitOfTemperature
+from homeassistant.const import PERCENTAGE, UnitOfLength, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -24,6 +24,9 @@ from .const import (
     CONF_PLANT_LOCATION,
     CONF_PLANT_NAME,
     CONF_PLANTS_JSON,
+    CONF_TANK_EMPTY_DISTANCE_CM,
+    CONF_TANK_FULL_DISTANCE_CM,
+    CONF_TANK_VOLUME_LITERS,
     DATA_COORDINATOR,
     DOMAIN,
 )
@@ -69,7 +72,7 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
     BoumValueSensorDescription(
         key="battery",
         translation_key="battery",
-        keys=("battery", "batteryLevel", "batteryPercent", "batteryPercentage", "soc"),
+        keys=("batteryCapacity", "battery", "batteryLevel", "batteryPercent", "batteryPercentage", "soc"),
         native_unit_of_measurement=PERCENTAGE,
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
@@ -109,6 +112,24 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
         translation_key="water_level",
         keys=("waterLevel", "tankLevel", "reservoirLevel", "waterTankLevel"),
         native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_type="float",
+        icon="mdi:cup-water",
+    ),
+    BoumValueSensorDescription(
+        key="water_distance",
+        translation_key="water_distance",
+        keys=("waterDistance", "waterDistanceCm", "water_distance", "water_distance_cm", "distance", "distanceCm", "sensorDistance", "sensorDistanceCm", "tankDistance", "tankDistanceCm", "waterLevelDistance", "waterLevelDistanceCm"),
+        native_unit_of_measurement=UnitOfLength.CENTIMETERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_type="float",
+        icon="mdi:arrow-expand-vertical",
+    ),
+    BoumValueSensorDescription(
+        key="water_liters_direct",
+        translation_key="water_liters_direct",
+        keys=("waterLiters", "waterLevelLiters", "waterVolumeLiters", "remainingWaterLiters", "reservoirLiters", "reservoirLevelLiters", "tankLevelLiters", "water_liters", "water_level_liters"),
+        native_unit_of_measurement="L",
         state_class=SensorStateClass.MEASUREMENT,
         value_type="float",
         icon="mdi:cup-water",
@@ -425,19 +446,13 @@ async def async_setup_entry(
             entities.append(BoumConfiguredPlantSensor(coordinator, device_id))
         entities.append(BoumPlantSummarySensor(coordinator, device_id))
         entities.append(BoumPotTableSensor(coordinator, device_id))
-        entities.append(BoumTelemetryPercentSensor(coordinator, device_id))
-        # Do not expose a separate water-tank percentage sensor: in the current
-        # Boum diagnostics the public telemetry is a single x/y series. The app
-        # shows 88% battery and 44 L water at the same time; therefore exposing
-        # "Wassertank 88%" is confusing. We expose battery as percentage and
-        # water only as litres derived from that same API percentage and a 50 L
-        # tank.
-        entities.append(BoumWaterTankLitersSensor(coordinator, device_id))
-        if (
-            _find_known_value(_sources(device), ("battery", "batteryLevel", "batteryPercent", "batteryPercentage", "soc"), ("reported", "telemetry", "desired")) is not None
-            or _telemetry_y_percent(device) is not None
-        ):
-            entities.append(BoumBatteryTelemetrySensor(coordinator, device_id))
+        # Do not expose unlabelled telemetry x/y as battery or water. Boum has
+        # confirmed that battery is `batteryCapacity` and water is calculated by
+        # the frontend from a distance in cm plus tank parameters.
+        # Therefore these app-style sensors are only created from named API fields
+        # or from an explicitly configured tank calculation.
+        if _water_tank_liters_available(coordinator.options, device):
+            entities.append(BoumWaterTankLitersSensor(coordinator, device_id))
         if _find_known_value(_sources(device), ("powerSaving", "powerSavingMode", "energySaving", "energySavingMode", "ecoMode", "sleepMode"), ("reported", "desired", "telemetry")) not in (None, ""):
             entities.append(BoumEnergySavingModeSensor(coordinator, device_id))
         for plant_entity in _plant_entities_for_device(coordinator, device_id, device):
@@ -703,14 +718,12 @@ def _next_refill_for_device(device: Mapping[str, Any]) -> Any:
 
 
 def _telemetry_y_percent(device: Mapping[str, Any]) -> float | None:
-    """Return latest Boum telemetry Y as a 0-100 percentage.
+    """Return latest Boum telemetry Y as an unlabelled 0-100 value.
 
-    The public Boum API export currently exposes the live app value as an x/y
-    time series. In Arthur's app this same value appears as battery percentage
-    (for example 88%). The water display is shown as litres (for example 44 L),
-    which can be derived from 88% of the 50 L tank. Temperature and power-save
-    mode are *not* guessed here; they are only exposed when the API has a named
-    field for them.
+    This value is intentionally not used as battery or tank level because the
+    public API does not label the x/y series. Battery should come from
+    `batteryCapacity`; water should come from a distance measurement and tank
+    configuration, or from a named litre field.
     """
     for key in ("_latest_telemetry", "_latest_telemetry_last_7d", "_latest_telemetry_last_hour"):
         value = device.get(key)
@@ -729,40 +742,93 @@ def _telemetry_y_percent(device: Mapping[str, Any]) -> float | None:
     return None
 
 
-class BoumTelemetryPercentSensor(BoumBaseSensor):
-    """Raw/unlabelled Boum telemetry Y percentage."""
+def _water_distance_cm(device: Mapping[str, Any]) -> float | None:
+    """Return a named API distance-to-water value in cm, if Boum exposes it."""
+    value = _find_known_value(
+        _sources(device),
+        (
+            "waterDistance",
+            "waterDistanceCm",
+            "water_distance",
+            "water_distance_cm",
+            "distance",
+            "distanceCm",
+            "sensorDistance",
+            "sensorDistanceCm",
+            "tankDistance",
+            "tankDistanceCm",
+            "waterLevelDistance",
+            "waterLevelDistanceCm",
+        ),
+        ("reported", "telemetry", "desired"),
+    )
+    return as_float(value)
 
-    _attr_name = "Live-Prozent"
-    _attr_icon = "mdi:gauge"
-    _attr_native_unit_of_measurement = PERCENTAGE
-    _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, coordinator: BoumGardenDataUpdateCoordinator, device_id: str) -> None:
-        super().__init__(coordinator, device_id)
-        self._attr_unique_id = f"{DOMAIN}_{device_id}_telemetry_percent"
+def _direct_water_liters(device: Mapping[str, Any]) -> float | None:
+    """Return a named API water volume in litres, if Boum exposes it."""
+    value = _find_known_value(
+        _sources(device),
+        (
+            "waterLiters",
+            "waterLevelLiters",
+            "waterVolumeLiters",
+            "remainingWaterLiters",
+            "reservoirLiters",
+            "reservoirLevelLiters",
+            "tankLevelLiters",
+            "water_liters",
+            "water_level_liters",
+        ),
+        ("reported", "telemetry", "desired"),
+    )
+    return as_float(value)
 
-    @property
-    def native_value(self) -> float | None:
-        if not self._device:
-            return None
-        value = _telemetry_y_percent(self._device)
-        return round(value, 1) if value is not None else None
 
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        return {
-            "source": "telemetry_y",
-            "meaning": "unlabelled",
-            "note": (
-                "Boum currently returns this live value as x/y without saying "
-                "whether y is battery, tank or another percentage. The integration "
-                "therefore exposes it separately and does not use it as battery fallback."
-            ),
-        }
+def _tank_option_float(options: Mapping[str, Any], key: str) -> float | None:
+    value = options.get(key)
+    return as_float(value)
+
+
+def _water_liters_from_distance(options: Mapping[str, Any], device: Mapping[str, Any]) -> tuple[float | None, dict[str, Any]]:
+    """Calculate tank litres from distance in cm and user-configured tank settings."""
+    direct = _direct_water_liters(device)
+    if direct is not None:
+        return round(max(direct, 0), 1), {"source": "named_api_liter_field", "api_liters": direct}
+
+    distance = _water_distance_cm(device)
+    volume = _tank_option_float(options, CONF_TANK_VOLUME_LITERS)
+    empty_cm = _tank_option_float(options, CONF_TANK_EMPTY_DISTANCE_CM)
+    full_cm = _tank_option_float(options, CONF_TANK_FULL_DISTANCE_CM)
+    meta = {
+        "source": "distance_cm_calculation",
+        "api_distance_cm": distance,
+        "tank_volume_liters": volume,
+        "tank_empty_distance_cm": empty_cm,
+        "tank_full_distance_cm": full_cm,
+        "calculation": "(empty_cm - distance_cm) / (empty_cm - full_cm) * tank_volume_liters",
+    }
+    if distance is None or volume is None or empty_cm is None or full_cm is None:
+        meta["missing"] = "Needs named API distance plus tank_volume_liters, tank_empty_distance_cm and tank_full_distance_cm options."
+        return None, meta
+    if volume <= 0 or empty_cm == full_cm:
+        meta["invalid_configuration"] = True
+        return None, meta
+
+    fraction = (empty_cm - distance) / (empty_cm - full_cm)
+    fraction = max(0.0, min(1.0, fraction))
+    litres = round(fraction * volume, 1)
+    meta["calculated_percent"] = round(fraction * 100, 1)
+    return litres, meta
+
+
+def _water_tank_liters_available(options: Mapping[str, Any], device: Mapping[str, Any]) -> bool:
+    litres, _meta = _water_liters_from_distance(options, device)
+    return litres is not None
 
 
 class BoumWaterTankLitersSensor(BoumBaseSensor):
-    """Water tank fill level in litres, derived from API telemetry percentage."""
+    """Water tank fill level in litres from named API data or configured distance calculation."""
 
     _attr_name = "Wasserfüllstand"
     _attr_icon = "mdi:cup-water"
@@ -777,66 +843,24 @@ class BoumWaterTankLitersSensor(BoumBaseSensor):
     def native_value(self) -> float | None:
         if not self._device:
             return None
-        percent = _telemetry_y_percent(self._device)
-        if percent is None:
-            return None
-        return round(percent * 0.5, 1)
+        litres, _meta = _water_liters_from_distance(self.coordinator.options, self._device)
+        return litres
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        percent = _telemetry_y_percent(self._device or {})
-        return {
-            "source": "derived_from_api_telemetry_y",
-            "tank_capacity_liters": 50,
-            "api_telemetry_percent": round(percent, 1) if percent is not None else None,
-            "calculation": "telemetry_y_percent * 50 L / 100",
-            "note": "The public API provides the live percentage as telemetry y. The app displays the water value in litres, so this sensor derives 44 L from 88% of the 50 L tank. No separate phantom tank-percent sensor is created.",
-        }
-
-
-class BoumBatteryTelemetrySensor(BoumBaseSensor):
-    """Battery percentage from named API field or Boum telemetry y."""
-
-    _attr_name = "Batterie"
-    _attr_icon = "mdi:battery"
-    _attr_native_unit_of_measurement = PERCENTAGE
-    _attr_device_class = SensorDeviceClass.BATTERY
-    _attr_state_class = SensorStateClass.MEASUREMENT
-
-    def __init__(self, coordinator: BoumGardenDataUpdateCoordinator, device_id: str) -> None:
-        super().__init__(coordinator, device_id)
-        self._attr_unique_id = f"{DOMAIN}_{device_id}_battery_telemetry"
-
-    @property
-    def native_value(self) -> float | None:
         if not self._device:
-            return None
-        value = _find_known_value(_sources(self._device), ("battery", "batteryLevel", "batteryPercent", "batteryPercentage", "soc"), ("reported", "telemetry", "desired"))
-        number = as_float(value)
-        if number is not None:
-            return round(number, 1)
-        y = _telemetry_y_percent(self._device)
-        return round(y, 1) if y is not None else None
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        value = _find_known_value(_sources(self._device or {}), ("battery", "batteryLevel", "batteryPercent", "batteryPercentage", "soc"), ("reported", "telemetry", "desired"))
-        y = _telemetry_y_percent(self._device or {})
-        return {
-            "source": "named_api_field" if value not in (None, "") else "api_telemetry_y",
-            "api_raw_value": value,
-            "api_telemetry_y": y,
+            return {}
+        _litres, meta = _water_liters_from_distance(self.coordinator.options, self._device)
+        return meta | {
             "note": (
-                "Battery uses a named API battery field when available. If Boum only "
-                "returns the live x/y telemetry series, y is used as the app-visible "
-                "battery percentage. Water is not exposed as the same percentage; it is "
-                "derived separately as litres from this percentage and the 50 L tank."
-            ),
+                "No phantom value is used. Water is shown only if Boum exposes a named "
+                "litre field or a named distance-in-cm field and the tank settings are configured."
+            )
         }
 
 
 class BoumEnergySavingModeSensor(BoumBaseSensor):
-    """Best-effort app-like power saving mode."""
+    """Power saving mode from named API field only."""
 
     _attr_name = "Stromsparmodus"
     _attr_icon = "mdi:moon-waning-crescent"
@@ -864,6 +888,7 @@ class BoumEnergySavingModeSensor(BoumBaseSensor):
             "api_raw_value": direct,
             "note": "Only shown when Boum exposes a named power-saving/eco/sleep mode field. No app-style phantom mode is created.",
         }
+
 
 class BoumPlantSummarySensor(BoumBaseSensor):
     """Plant summary sensor."""
