@@ -20,9 +20,68 @@
               include:
                 - entity_id: sensor.garten_pflanzcontainer_*
                   options:
-                    type: tile
-                    icon: mdi:flower-tulip
-                    color: green
+                    type: custom:button-card
+                    show_icon: false
+                    show_name: true
+                    show_state: true
+                    show_label: true
+                    aspect_ratio: 1/1.25
+                    name: |
+                      [[[
+                        return entity.attributes.friendly_name || entity.entity_id;
+                      ]]]
+                    label: |
+                      [[[
+                        const names = entity.attributes.plant_names || entity.attributes.pflanzen || entity.attributes.plants || entity.state;
+                        if (Array.isArray(names)) return names.join(", ");
+                        return names || "";
+                      ]]]
+                    styles:
+                      card:
+                        - border-radius: 22px
+                        - overflow: hidden
+                        - padding: 0
+                        - background: |
+                            [[[
+                              const imgs = entity.attributes.image_urls || entity.attributes.images || entity.attributes.image_url || "";
+                              let img = "";
+                              if (Array.isArray(imgs) && imgs.length > 0) img = imgs[0];
+                              else if (typeof imgs === "string") img = imgs;
+                              if (img) return `linear-gradient(to bottom, rgba(0,0,0,0.06), rgba(0,0,0,0.72)), url("${img}")`;
+                              return "linear-gradient(145deg, #dff5e4, #ffffff)";
+                            ]]]
+                        - background-size: cover
+                        - background-position: center
+                        - box-shadow: 0 10px 24px rgba(0,0,0,0.18)
+                      grid:
+                        - grid-template-areas: '"n" "s" "l"'
+                        - grid-template-rows: 1fr min-content min-content
+                        - height: 100%
+                      name:
+                        - align-self: end
+                        - justify-self: start
+                        - padding: 0 14px
+                        - color: white
+                        - font-weight: 800
+                        - font-size: 18px
+                        - text-shadow: 0 2px 8px rgba(0,0,0,0.85)
+                      state:
+                        - justify-self: start
+                        - padding: 2px 14px 0 14px
+                        - color: white
+                        - font-weight: 700
+                        - font-size: 14px
+                        - text-shadow: 0 2px 8px rgba(0,0,0,0.85)
+                      label:
+                        - justify-self: start
+                        - padding: 0 14px 14px 14px
+                        - color: rgba(255,255,255,0.92)
+                        - font-size: 13px
+                        - white-space: normal
+                        - text-align: left
+                        - text-shadow: 0 2px 8px rgba(0,0,0,0.85)
+                    tap_action:
+                      action: more-info
               exclude:
                 - entity_id: sensor.garten_pflanzcontainer_*_zuletzt_bewassert
                 - entity_id: sensor.garten_pflanzcontainer_*_zuletzt_bewaessert
@@ -58,6 +117,20 @@
             detail: 2
 
           - type: sensor
+            entity: sensor.garten_wasserfullstand
+            name: Wasserfüllstand
+            icon: mdi:cup-water
+            graph: line
+            detail: 2
+
+          - type: sensor
+            entity: sensor.garten_wassertank
+            name: Wassertank
+            icon: mdi:gauge
+            graph: line
+            detail: 2
+
+          - type: sensor
             entity: sensor.garten_wasserabstand
             name: Wasserabstand
             icon: mdi:arrow-expand-vertical
@@ -71,18 +144,37 @@
             graph: line
             detail: 2
 
+      - type: grid
+        cards:
+          - type: heading
+            icon: mdi:history
+            heading: 24h Verlauf
+
           - type: history-graph
-            title: 24h Verlauf
+            title: Batterie / Temperatur / Wasser
             hours_to_show: 24
             entities:
               - entity: sensor.garten_batterie
                 name: Batterie
               - entity: sensor.garten_temperatur
                 name: Temperatur
+              - entity: sensor.garten_wasserfullstand
+                name: Wasserfüllstand
+              - entity: sensor.garten_wassertank
+                name: Wassertank
               - entity: sensor.garten_wasserabstand
                 name: Wasserabstand
+
+          - type: history-graph
+            title: Bewässerung
+            hours_to_show: 24
+            entities:
               - entity: sensor.garten_durchfluss
                 name: Durchfluss
+              - entity: sensor.garten_pumpenstatus
+                name: Pumpenstatus
+              - entity: switch.garten_pumpe
+                name: Pumpe
 
       - type: grid
         cards:
@@ -98,79 +190,53 @@
             tap_action:
               action: toggle
 
-          - type: custom:auto-entities
-            card:
-              type: grid
-              columns: 2
-              square: false
-            card_param: cards
-            filter:
-              include:
-                - entity_id: sensor.garten_nachste_bewaesserung
-                  options:
-                    type: tile
-                    name: Nächste Bewässerung
-                    icon: mdi:calendar-clock
-                    color: blue
-                - entity_id: sensor.garten_nächste_bewässerung
-                  options:
-                    type: tile
-                    name: Nächste Bewässerung
-                    icon: mdi:calendar-clock
-                    color: blue
-                - entity_id: sensor.garten_pumpenstatus
-                  options:
-                    type: tile
-                    icon: mdi:pump
-                    color: blue
-                - entity_id: sensor.garten_pumpen_abgleich
-                  options:
-                    type: tile
-                    name: Pumpen-Abgleich
-                    icon: mdi:sync
-                    color: blue
-                - entity_id: sensor.garten_nachfullzeit
-                  options:
-                    type: tile
-                    name: Nachfüllzeit
-                    icon: mdi:clock-outline
-                    color: cyan
-                - entity_id: sensor.garten_nachfüllzeit
-                  options:
-                    type: tile
-                    name: Nachfüllzeit
-                    icon: mdi:clock-outline
-                    color: cyan
-                - entity_id: sensor.garten_nachfullintervall
-                  options:
-                    type: tile
-                    name: Nachfüllintervall
-                    icon: mdi:calendar-refresh
-                    color: cyan
-                - entity_id: sensor.garten_nachfüllintervall
-                  options:
-                    type: tile
-                    name: Nachfüllintervall
-                    icon: mdi:calendar-refresh
-                    color: cyan
-                - entity_id: sensor.garten_maximale_pumpdauer
-                  options:
-                    type: tile
-                    name: Maximale Pumpdauer
-                    icon: mdi:timer-outline
-                    color: cyan
-              exclude:
-                - entity_id: "*telemetry*"
-                - entity_id: "*timestamp*"
-                - entity_id: "*last_hour*"
-                - entity_id: "*last_7d*"
-                - entity_id: "*api_user*"
-                - entity_id: "*owner*"
-                - entity_id: "*token*"
-                - entity_id: "*preview*"
-                - entity_id: "*truncated*"
-            sort:
-              method: name
+          - type: tile
+            entity: sensor.garten_pumpenstatus
+            name: Pumpenstatus
+            icon: mdi:pump
+            color: blue
+
+          - type: tile
+            entity: sensor.garten_pumpenstatus_gemeldet
+            name: Gemeldet
+            icon: mdi:pump
+            color: blue
+
+          - type: tile
+            entity: sensor.garten_pumpenstatus_gewunscht
+            name: Gewünscht
+            icon: mdi:pump-outline
+            color: blue
+
+          - type: tile
+            entity: sensor.garten_pumpen_abgleich
+            name: Pumpen-Abgleich
+            icon: mdi:sync
+            color: blue
+
+          - type: tile
+            entity: sensor.garten_nachfullzeit
+            name: Nachfüllzeit
+            icon: mdi:clock-outline
+            color: cyan
+
+          - type: tile
+            entity: sensor.garten_nachfullintervall
+            name: Nachfüllintervall
+            icon: mdi:calendar-refresh
+            color: cyan
+
+          - type: tile
+            entity: sensor.garten_nachste_bewaesserung
+            name: Nächste Bewässerung
+            icon: mdi:calendar-clock
+            color: blue
+
+          - type: tile
+            entity: sensor.garten_maximale_pumpdauer
+            name: Maximale Pumpdauer
+            icon: mdi:timer-outline
+            color: cyan
 
       - type: grid
         cards:
@@ -230,13 +296,19 @@
                   options:
                     type: tile
                     name: Wasserfüllstand
-                    icon: mdi:water
+                    icon: mdi:cup-water
                     color: blue
                 - entity_id: sensor.garten_wasserfüllstand
                   options:
                     type: tile
                     name: Wasserfüllstand
-                    icon: mdi:water
+                    icon: mdi:cup-water
+                    color: blue
+                - entity_id: sensor.garten_wassertank
+                  options:
+                    type: tile
+                    name: Wassertank
+                    icon: mdi:gauge
                     color: blue
                 - entity_id: sensor.garten_wasserabstand
                   options:

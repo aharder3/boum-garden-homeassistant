@@ -4,7 +4,7 @@
 
 # Boum Garden
 
-Aktuelle Version: 0.2.4 for Home Assistant
+Aktuelle Version: 0.3.2 for Home Assistant
 
 Custom Home Assistant integration for Boum Garden devices using the Boum IoT REST API directly.
 
@@ -89,15 +89,14 @@ Boum confirmed that the app currently calculates water level in the frontend fro
 
 Known Boum sizes from public product information:
 
-- Boum Core water tank: 32 L
-- Boum Pro water tank: 35 L
-- Boum Pro water tank: 55 L
+- Boum water tank: 35 L
+- Boum water tank: 55 L
 - Boum Core pot: 13 L
 - Boum Pro pot: 15 L
 - Boum Pro pot: 30 L
 - Core/Pro pot internal reservoir: 2 L
 
-For the water level calculation, configure the main tank volume and the measured distances for an empty and full tank in the integration options. The 2 L reservoir belongs to each individual pot and is not the main water tank volume.
+For the 35 L tank, the integration uses Boum's frontend formula from `waterTableRange` and does not need manual empty/full calibration. For the 55 L or custom tank, configure empty/full distances to calculate a generic percentage and, when a volume is known, litres, until Boum exposes the 55 L formula or tank metadata through the API. The 2 L reservoir belongs to each individual pot and is not the main water tank volume.
 
 Formula:
 
@@ -261,3 +260,29 @@ Note: Boum currently exposes pump/refill information at device level in the avai
 - Support water tank litre calculation from `waterTableRange` plus configured tank settings.
 - Add `wifiStrength` as signal strength.
 - Do not interpret anonymous `x/y` rows as battery, temperature or tank values.
+
+
+
+### 0.3.2
+
+- Corrected tank presets to the currently relevant Boum tank sizes: 35 L and 55 L.
+- The 35 L tank uses the Boum-provided frontend formula from `waterTableRange`.
+- The 55 L tank uses generic empty/full distance calibration until Boum provides the 55 L formula or tank metadata via API.
+- README now documents optional dashboard plugins required by the included Lovelace examples.
+
+### 0.3.1
+
+- Added the Boum-provided 35 L tank frontend formula for `waterTableRange`.
+- Large 35 L tank now calculates litres and percent without manual empty/full distance calibration.
+- 55 L and custom tanks continue to use generic empty/full distance calibration until Boum exposes the 55 L tank metadata or formula through the API.
+- Added `waterTableRange` to the normal water distance sensor aliases.
+
+## Optional dashboard plugins
+
+The integration itself does not require frontend plugins. The included Lovelace dashboard examples use optional custom cards for a nicer layout:
+
+- `custom:auto-entities` for automatically listing all Boum plant containers and buttons
+- `custom:button-card` for modern plant image cards
+- `browser_mod` is optional only if you want advanced popups; the default dashboard uses Home Assistant `more-info` so it also works without browser_mod
+
+Install these through HACS if you want to use the included dashboard snippets unchanged. Without them, use normal Home Assistant `tile`, `sensor` and `history-graph` cards instead.

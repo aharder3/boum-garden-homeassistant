@@ -121,7 +121,7 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
     BoumValueSensorDescription(
         key="water_distance",
         translation_key="water_distance",
-        keys=("waterDistance", "waterDistanceCm", "water_distance", "water_distance_cm", "distance", "distanceCm", "sensorDistance", "sensorDistanceCm", "tankDistance", "tankDistanceCm", "waterTankDistance", "waterTankDistanceCm", "waterLevelDistance", "waterLevelDistanceCm", "distanceToWater", "distanceToWaterCm", "waterSurfaceDistance", "waterSurfaceDistanceCm", "ultrasonicDistance", "ultrasonicDistanceCm", "tankSensorDistance", "tankSensorDistanceCm"),
+        keys=("waterTableRange", "water_table_range", "waterDistance", "waterDistanceCm", "water_distance", "water_distance_cm", "distance", "distanceCm", "sensorDistance", "sensorDistanceCm", "tankDistance", "tankDistanceCm", "waterTankDistance", "waterTankDistanceCm", "waterLevelDistance", "waterLevelDistanceCm", "distanceToWater", "distanceToWaterCm", "waterSurfaceDistance", "waterSurfaceDistanceCm", "ultrasonicDistance", "ultrasonicDistanceCm", "tankSensorDistance", "tankSensorDistanceCm"),
         native_unit_of_measurement=UnitOfLength.CENTIMETERS,
         state_class=SensorStateClass.MEASUREMENT,
         value_type="float",
@@ -456,6 +456,8 @@ async def async_setup_entry(
         # or from an explicitly configured tank calculation.
         if _water_tank_liters_available(coordinator.options, device):
             entities.append(BoumWaterTankLitersSensor(coordinator, device_id))
+        if _water_tank_percent_available(coordinator.options, device):
+            entities.append(BoumWaterTankPercentSensor(coordinator, device_id))
         if _find_known_value(_sources(device), ("powerSaving", "powerSavingMode", "energySaving", "energySavingMode", "ecoMode", "sleepMode"), ("reported", "desired", "telemetry")) not in (None, ""):
             entities.append(BoumEnergySavingModeSensor(coordinator, device_id))
         for plant_entity in _plant_entities_for_device(coordinator, device_id, device):
@@ -807,44 +809,149 @@ def _tank_option_float(options: Mapping[str, Any], key: str) -> float | None:
     return as_float(value)
 
 
+def _clamp(value: float, minimum: float, maximum: float) -> float:
+    return max(minimum, min(maximum, value))
+
+
+def _boum_35l_liters_from_distance(distance_cm: float) -> tuple[float, dict[str, Any]]:
+    """Calculate the Boum 35 L tank level from waterTableRange.
+
+    Formula provided by Boum's frontend/InfluxDB query:
+
+        ((40 - d) * 3.14 / (3 * 1000)) *
+        ((19 - d / 10)^2 + (19 - d / 10) * 14.5 + 14.5^2)
+
+    The formula returns litres for the 35 L tank from the measured distance.
+    """
+    raw_liters = (
+        ((40.0 - distance_cm) * 3.14 / (3.0 * 1000.0))
+        * (
+            (19.0 - distance_cm / 10.0) * (19.0 - distance_cm / 10.0)
+            + (19.0 - distance_cm / 10.0) * 14.5
+            + 14.5 * 14.5
+        )
+    )
+    # Keep the value sane for Home Assistant even if the ultrasonic value briefly
+    # jumps outside the physical tank range.
+    liters = round(_clamp(raw_liters, 0.0, 35.0), 1)
+    percent = round(_clamp(liters / 35.0 * 100.0, 0.0, 100.0), 1)
+    return liters, {
+        "source": "boum_35l_frontend_formula",
+        "api_distance_cm": distance_cm,
+        "tank_preset": "tank_35l",
+        "tank_volume_liters": 35.0,
+        "formula_raw_liters": round(raw_liters, 3),
+        "calculated_percent": percent,
+        "calculation": "((40-d)*3.14/(3*1000))*((19-d/10)^2+(19-d/10)*14.5+14.5^2)",
+        "note": "Formula provided by Boum for the 35 L tank. Result is clamped to 0–35 L.",
+    }
+
+
+def _generic_percent_from_distance(
+    distance_cm: float | None,
+    empty_cm: float | None,
+    full_cm: float | None,
+) -> tuple[float | None, dict[str, Any]]:
+    meta = {
+        "source": "distance_cm_percent_calculation",
+        "api_distance_cm": distance_cm,
+        "tank_empty_distance_cm": empty_cm,
+        "tank_full_distance_cm": full_cm,
+        "calculation": "(empty_cm - distance_cm) / (empty_cm - full_cm) * 100",
+    }
+    if distance_cm is None or empty_cm is None or full_cm is None:
+        meta["missing"] = "Needs a named API distance in cm plus empty/full distance settings."
+        return None, meta
+    if empty_cm == full_cm:
+        meta["invalid_configuration"] = True
+        return None, meta
+    fraction = (empty_cm - distance_cm) / (empty_cm - full_cm)
+    percent = round(_clamp(fraction * 100.0, 0.0, 100.0), 1)
+    meta["calculated_percent"] = percent
+    return percent, meta
+
+
+
+def _normalise_tank_preset(value: Any) -> str:
+    """Normalize current and legacy tank preset values."""
+    preset = str(value or "custom")
+    if preset == "large_35l":
+        return "tank_35l"
+    if preset == "small_32l":
+        # Legacy value from early builds. Boum currently uses 35 L and 55 L tanks,
+        # so keep existing users on the known 35 L formula instead of showing a
+        # non-existent 32 L preset. Users with a 55 L tank should select tank_55l.
+        return "tank_35l"
+    return preset
+
 def _water_liters_from_distance(options: Mapping[str, Any], device: Mapping[str, Any]) -> tuple[float | None, dict[str, Any]]:
-    """Calculate tank litres from distance in cm and user-configured tank settings."""
+    """Calculate tank litres from API data.
+
+    Priority:
+    1. Direct named litres from Boum, if ever exposed.
+    2. Boum-provided 35 L tank frontend formula from waterTableRange.
+    3. Generic distance calculation for 55 L/custom tanks when empty/full
+       calibration distances are configured.
+    """
     direct = _direct_water_liters(device)
     if direct is not None:
         return round(max(direct, 0), 1), {"source": "named_api_liter_field", "api_liters": direct}
 
     distance = _water_distance_cm(device)
-    preset = str(options.get(CONF_TANK_PRESET, "custom") or "custom")
+    preset = _normalise_tank_preset(options.get(CONF_TANK_PRESET, "custom"))
+
+    if preset == "tank_35l" and distance is not None:
+        return _boum_35l_liters_from_distance(distance)
+
     preset_volume = TANK_PRESETS.get(preset)
     volume = preset_volume if preset_volume is not None else _tank_option_float(options, CONF_TANK_VOLUME_LITERS)
     empty_cm = _tank_option_float(options, CONF_TANK_EMPTY_DISTANCE_CM)
     full_cm = _tank_option_float(options, CONF_TANK_FULL_DISTANCE_CM)
-    meta = {
-        "source": "distance_cm_calculation",
-        "api_distance_cm": distance,
+    percent, percent_meta = _generic_percent_from_distance(distance, empty_cm, full_cm)
+    meta = percent_meta | {
         "tank_preset": preset,
         "tank_volume_liters": volume,
-        "tank_empty_distance_cm": empty_cm,
-        "tank_full_distance_cm": full_cm,
         "calculation": "(empty_cm - distance_cm) / (empty_cm - full_cm) * tank_volume_liters",
     }
-    if distance is None or volume is None or empty_cm is None or full_cm is None:
-        meta["missing"] = "Needs a named API distance in cm plus tank preset/custom volume, tank_empty_distance_cm and tank_full_distance_cm options. Known Boum tanks are 32 L (small) and 35 L (large); the 2 L value is the small reservoir inside each pot, not the main tank."
+    if percent is None or volume is None:
+        meta["missing"] = (
+            "For the 35 L tank, select tank_35l and no empty/full distance is required. "
+            "For the 55 L or custom tank, configure tank volume plus empty/full distances. "
+            "Boum has not yet provided the 55 L frontend formula."
+        )
         return None, meta
-    if volume <= 0 or empty_cm == full_cm:
+    if volume <= 0:
         meta["invalid_configuration"] = True
         return None, meta
 
-    fraction = (empty_cm - distance) / (empty_cm - full_cm)
-    fraction = max(0.0, min(1.0, fraction))
-    litres = round(fraction * volume, 1)
-    meta["calculated_percent"] = round(fraction * 100, 1)
+    litres = round(percent / 100.0 * volume, 1)
     return litres, meta
+
+
+def _water_percent_from_distance(options: Mapping[str, Any], device: Mapping[str, Any]) -> tuple[float | None, dict[str, Any]]:
+    """Return tank fill percent from known calculations where possible."""
+    distance = _water_distance_cm(device)
+    preset = _normalise_tank_preset(options.get(CONF_TANK_PRESET, "custom"))
+
+    if preset == "tank_35l" and distance is not None:
+        _liters, meta = _boum_35l_liters_from_distance(distance)
+        return meta.get("calculated_percent"), meta
+
+    empty_cm = _tank_option_float(options, CONF_TANK_EMPTY_DISTANCE_CM)
+    full_cm = _tank_option_float(options, CONF_TANK_FULL_DISTANCE_CM)
+    percent, meta = _generic_percent_from_distance(distance, empty_cm, full_cm)
+    meta["tank_preset"] = preset
+    return percent, meta
 
 
 def _water_tank_liters_available(options: Mapping[str, Any], device: Mapping[str, Any]) -> bool:
     litres, _meta = _water_liters_from_distance(options, device)
     return litres is not None
+
+
+def _water_tank_percent_available(options: Mapping[str, Any], device: Mapping[str, Any]) -> bool:
+    percent, _meta = _water_percent_from_distance(options, device)
+    return percent is not None
 
 
 class BoumWaterTankLitersSensor(BoumBaseSensor):
@@ -875,6 +982,39 @@ class BoumWaterTankLitersSensor(BoumBaseSensor):
             "note": (
                 "No phantom value is used. Water is shown only if Boum exposes a named "
                 "litre field or a named distance-in-cm field and the tank settings are configured."
+            )
+        }
+
+
+
+class BoumWaterTankPercentSensor(BoumBaseSensor):
+    """Water tank fill level in percent from configured tank calculation."""
+
+    _attr_name = "Wassertank"
+    _attr_icon = "mdi:water-percent"
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator: BoumGardenDataUpdateCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{DOMAIN}_{device_id}_water_tank_percent"
+
+    @property
+    def native_value(self) -> float | None:
+        if not self._device:
+            return None
+        percent, _meta = _water_percent_from_distance(self.coordinator.options, self._device)
+        return percent
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        if not self._device:
+            return {}
+        _percent, meta = _water_percent_from_distance(self.coordinator.options, self._device)
+        return meta | {
+            "note": (
+                "No phantom value is used. Percent is calculated from Boum's 35 L formula "
+                "or from configured empty/full distances."
             )
         }
 

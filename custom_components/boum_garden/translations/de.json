@@ -49,7 +49,7 @@
           "tank_empty_distance_cm": "Sensor-Abstand bei leerem Tank in cm",
           "tank_full_distance_cm": "Sensor-Abstand bei vollem Tank in cm"
         },
-        "description": "Optionale lokale Pflanzendaten werden nur verwendet, wenn Boum keine Pflanzennamen über die API liefert. Für den Wasserfüllstand: Tankgrösse wählen (klein 32 L oder gross 35 L) und die Sensor-Abstände bei leerem und vollem Tank eintragen. Ohne diese beiden Distanzwerte wird nur der Wasserabstand angezeigt."
+        "description": "Optionale lokale Pflanzendaten werden nur verwendet, wenn Boum keine Pflanzennamen über die API liefert. Für den Wasserfüllstand: Tankgrösse wählen. Der grosse 35-L-Tank nutzt die Boum-Frontend-Formel aus waterTableRange. Für den 55-L- oder benutzerdefinierten Tank sind leer/voll-Distanzwerte nötig, bis Boum die 55-L-Formel oder Tankdaten per API liefert."
       }
     }
   },

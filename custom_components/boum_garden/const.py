@@ -8,7 +8,7 @@ from homeassistant.const import Platform
 DOMAIN = "boum_garden"
 NAME = "Boum Garden"
 MANUFACTURER = "Boum"
-VERSION = "0.3.0"
+VERSION = "0.3.2"
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.BUTTON]
 
@@ -44,7 +44,7 @@ DATA_COORDINATOR = "coordinator"
 
 TANK_PRESETS = {
     "custom": None,
-    "small_32l": 32.0,
-    "large_35l": 35.0,
+    "tank_35l": 35.0,
+    "tank_55l": 55.0,
 }
-DEFAULT_TANK_PRESET = "custom"
+DEFAULT_TANK_PRESET = "tank_35l"

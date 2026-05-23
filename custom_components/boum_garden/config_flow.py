@@ -44,9 +44,19 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+
+def _normalise_tank_preset(value: Any) -> str:
+    """Normalize current and legacy tank preset values for forms/options."""
+    preset = str(value or DEFAULT_TANK_PRESET)
+    if preset in {"large_35l", "small_32l"}:
+        return "tank_35l"
+    if preset not in TANK_PRESETS:
+        return DEFAULT_TANK_PRESET
+    return preset
+
 def _tank_options_from_mapping(values: dict[str, Any]) -> dict[str, Any]:
     """Extract tank options from config/options form values."""
-    tank_preset = values.get(CONF_TANK_PRESET, DEFAULT_TANK_PRESET) or DEFAULT_TANK_PRESET
+    tank_preset = _normalise_tank_preset(values.get(CONF_TANK_PRESET, DEFAULT_TANK_PRESET))
     out: dict[str, Any] = {CONF_TANK_PRESET: tank_preset}
 
     # Keep empty values out of options to avoid ugly empty strings in storage.
@@ -222,7 +232,7 @@ class BoumGardenOptionsFlow(config_entries.OptionsFlow):
                     ): TextSelector(TextSelectorConfig(multiline=True)),
                     vol.Optional(
                         CONF_TANK_PRESET,
-                        default=options.get(CONF_TANK_PRESET, self._config_entry.data.get(CONF_TANK_PRESET, DEFAULT_TANK_PRESET)),
+                        default=_normalise_tank_preset(options.get(CONF_TANK_PRESET, self._config_entry.data.get(CONF_TANK_PRESET, DEFAULT_TANK_PRESET))),
                     ): SelectSelector(
                         SelectSelectorConfig(
                             options=list(TANK_PRESETS.keys()),
@@ -246,8 +256,8 @@ class BoumGardenOptionsFlow(config_entries.OptionsFlow):
             description_placeholders={
                 "tank_help": (
                     "Use the main Boum tank volume, not the 2 L pot reservoir. "
-                    "Known Boum tanks are 32 L (small) and 35 L (large). Select the tank preset or use custom. "
-                    "Water level is calculated only when Boum exposes a distance in cm."
+                    "The 35 L tank uses Boum's frontend formula from waterTableRange. "
+                    "For the 55 L or custom tank, set empty/full distances until Boum exposes the 55 L formula."
                 )
             },
         )
@@ -273,7 +283,7 @@ def _user_schema(user_input: dict[str, Any] | None = None) -> vol.Schema:
             ): vol.All(vol.Coerce(int), vol.Range(min=60, max=86400)),
             vol.Optional(
                 CONF_TANK_PRESET,
-                default=defaults.get(CONF_TANK_PRESET, DEFAULT_TANK_PRESET),
+                default=_normalise_tank_preset(defaults.get(CONF_TANK_PRESET, DEFAULT_TANK_PRESET)),
             ): SelectSelector(
                 SelectSelectorConfig(
                     options=list(TANK_PRESETS.keys()),
