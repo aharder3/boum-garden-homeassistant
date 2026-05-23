@@ -194,7 +194,7 @@ Plant names and plant care metadata are read from the Boum user API. The integra
 
 ## Dashboard
 
-Ab Version 0.2.1 erstellt die Integration pro Boum-`plantContainerId` eine eigene Topf-Entität. Wenn mehrere Pflanzen im selben Topf sind, erscheinen sie in **einer** Entität und nicht als mehrere Töpfe. Zusätzlich gibt es den Sensor **Pflanztopf Tabelle** mit den Attributen `rows`, `containers` und `markdown_table`.
+Ab Version 0.2.3 erstellt die Integration pro Boum-`plantContainerId` eine eigene Topf-Entität. Wenn mehrere Pflanzen im selben Topf sind, erscheinen sie in **einer** Entität und nicht als mehrere Töpfe. Zusätzlich gibt es den Sensor **Pflanztopf Tabelle** mit den Attributen `rows`, `containers` und `markdown_table`.
 
 Ein Beispiel-Dashboard liegt hier:
 
@@ -204,7 +204,7 @@ Ein Beispiel-Dashboard liegt hier:
 
 Die dynamischen Karten nutzen `custom:auto-entities` und Mushroom Cards. Die Markdown-Tabelle kann auch ohne Mushroom verwendet werden, sofern du die Entity-ID des Sensors **Pflanztopf Tabelle** einsetzt.
 
-## 0.2.1
+## 0.2.3
 
 - Pro `plantContainerId` wird jetzt genau eine Pflanztopf-Entität erstellt.
 - Mehrere Pflanzen pro Topf werden als Pflanzenliste und Detailattribute zusammengeführt.
@@ -213,7 +213,7 @@ Die dynamischen Karten nutzen `custom:auto-entities` und Mushroom Cards. Die Mar
 - Beispiel-Dashboard für Lovelace ergänzt.
 
 
-## Version 0.2.1
+## Version 0.2.3
 
 - Added one derived “last watered” timestamp entity per plant container.
 - Added “Nächste Bewässerung” derived from `refillTime`, `refillInterval` and `dailyRefill`.
