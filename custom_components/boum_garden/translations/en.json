@@ -151,6 +151,18 @@
       },
       "refill_time": {
         "name": "Refill time"
+      },
+      "water_tank_percent": {
+        "name": "Water tank"
+      },
+      "water_tank_liters": {
+        "name": "Water fill level"
+      },
+      "battery_telemetry": {
+        "name": "Battery"
+      },
+      "energy_saving_mode": {
+        "name": "Power saving mode"
       }
     },
     "switch": {
