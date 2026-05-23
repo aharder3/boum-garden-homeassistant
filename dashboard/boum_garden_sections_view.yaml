@@ -23,34 +23,40 @@
                     type: custom:button-card
                     show_icon: false
                     show_name: true
-                    show_state: true
+                    show_state: false
                     show_label: true
                     aspect_ratio: 1/1.25
                     name: |
                       [[[
-                        return entity.attributes.friendly_name || entity.entity_id;
+                        const friendly = entity.attributes.friendly_name || "";
+                        const entityId = entity.entity_id || "";
+
+                        let match =
+                          friendly.match(/(\d{1,2})$/) ||
+                          entityId.match(/_(\d{1,2})$/);
+
+                        if (match) {
+                          return `Pflanzcontainer ${match[1].padStart(2, "0")}`;
+                        }
+
+                        return friendly
+                          .replace(/^Garten\s+/i, "")
+                          .replace(/Pflanzcontainer\s*/i, "Pflanzcontainer ");
                       ]]]
                     label: |
                       [[[
-                        const names = entity.attributes.plant_names || entity.attributes.pflanzen || entity.attributes.plants || entity.state;
-                        if (Array.isArray(names)) return names.join(", ");
+                        const names =
+                          entity.attributes.plant_names ||
+                          entity.attributes.pflanzen ||
+                          entity.attributes.plants ||
+                          entity.state;
+
+                        if (Array.isArray(names)) {
+                          return names.join(", ");
+                        }
+
                         return names || "";
                       ]]]
-                    custom_fields:
-                      thumbs: |
-                        [[[
-                          const imgsRaw = entity.attributes.image_urls || entity.attributes.images || entity.attributes.image_url || [];
-                          const imgs = Array.isArray(imgsRaw) ? imgsRaw : (imgsRaw ? [imgsRaw] : []);
-                          if (imgs.length <= 1) return "";
-                          const visible = imgs.slice(0, 3);
-                          const html = visible.map((img) =>
-                            `<img src="${img}" style="width:34px;height:34px;object-fit:cover;border-radius:50%;border:2px solid rgba(255,255,255,.92);box-shadow:0 2px 8px rgba(0,0,0,.45);margin-left:-8px;">`
-                          ).join("");
-                          const more = imgs.length > 3
-                            ? `<span style="width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.58);border:2px solid rgba(255,255,255,.92);color:white;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;margin-left:-8px;box-shadow:0 2px 8px rgba(0,0,0,.45);">+${imgs.length - 3}</span>`
-                            : "";
-                          return `<div style="display:flex;align-items:center;justify-content:flex-end;padding-right:8px;">${html}${more}</div>`;
-                        ]]]
                     styles:
                       card:
                         - border-radius: 22px
@@ -58,26 +64,33 @@
                         - padding: 0
                         - background: |
                             [[[
-                              const imgs = entity.attributes.image_urls || entity.attributes.images || entity.attributes.image_url || "";
+                              const imgs =
+                                entity.attributes.image_urls ||
+                                entity.attributes.images ||
+                                entity.attributes.image_url ||
+                                "";
+
                               let img = "";
-                              if (Array.isArray(imgs) && imgs.length > 0) img = imgs[0];
-                              else if (typeof imgs === "string") img = imgs;
-                              if (img) return `linear-gradient(to bottom, rgba(0,0,0,0.06), rgba(0,0,0,0.72)), url("${img}")`;
+
+                              if (Array.isArray(imgs) && imgs.length > 0) {
+                                img = imgs[0];
+                              } else if (typeof imgs === "string") {
+                                img = imgs;
+                              }
+
+                              if (img) {
+                                return `linear-gradient(to bottom, rgba(0,0,0,0.04), rgba(0,0,0,0.72)), url("${img}")`;
+                              }
+
                               return "linear-gradient(145deg, #dff5e4, #ffffff)";
                             ]]]
                         - background-size: cover
                         - background-position: center
                         - box-shadow: 0 10px 24px rgba(0,0,0,0.18)
                       grid:
-                        - grid-template-areas: '"n" "s" "l"'
-                        - grid-template-rows: 1fr min-content min-content
+                        - grid-template-areas: '"n" "l"'
+                        - grid-template-rows: 1fr min-content
                         - height: 100%
-                      custom_fields:
-                        thumbs:
-                          - position: absolute
-                          - top: 10px
-                          - right: 10px
-                          - z-index: 2
                       name:
                         - align-self: end
                         - justify-self: start
@@ -86,34 +99,30 @@
                         - font-weight: 800
                         - font-size: 18px
                         - text-shadow: 0 2px 8px rgba(0,0,0,0.85)
-                      state:
-                        - justify-self: start
-                        - padding: 2px 14px 0 14px
-                        - color: white
-                        - font-weight: 700
-                        - font-size: 14px
-                        - text-shadow: 0 2px 8px rgba(0,0,0,0.85)
                       label:
                         - justify-self: start
-                        - padding: 0 14px 14px 14px
-                        - color: rgba(255,255,255,0.92)
-                        - font-size: 13px
+                        - padding: 2px 14px 14px 14px
+                        - color: rgba(255,255,255,0.94)
+                        - font-size: 15px
+                        - font-weight: 600
                         - white-space: normal
                         - text-align: left
                         - text-shadow: 0 2px 8px rgba(0,0,0,0.85)
                     tap_action:
                       action: more-info
+
               exclude:
                 - entity_id: sensor.garten_pflanzcontainer_*_zuletzt_bewassert
                 - entity_id: sensor.garten_pflanzcontainer_*_zuletzt_bewaessert
                 - entity_id: sensor.garten_pflanzcontainer_*_zuletzt_bewässert
                 - entity_id: "*timestamp*"
-                - entity_id: "*telemetry*"
+                - entity_id: "*telemetry*_timestamp"
                 - entity_id: "*api_user*"
                 - entity_id: "*owner*"
                 - entity_id: "*token*"
                 - entity_id: "*preview*"
                 - entity_id: "*truncated*"
+
             sort:
               method: name
 
@@ -123,47 +132,116 @@
             icon: mdi:chart-line
             heading: Status & Verlauf
 
-          - type: sensor
-            entity: sensor.garten_batterie
-            name: Batterie
-            icon: mdi:battery
-            graph: line
-            detail: 2
+          - type: custom:auto-entities
+            card:
+              type: grid
+              columns: 2
+              square: false
+            card_param: cards
+            filter:
+              include:
+                - entity_id: sensor.garten_batterie
+                  options:
+                    type: sensor
+                    name: Batterie
+                    icon: mdi:battery
+                    graph: line
+                    detail: 2
 
-          - type: sensor
-            entity: sensor.garten_temperatur
-            name: Temperatur
-            icon: mdi:thermometer
-            graph: line
-            detail: 2
+                - entity_id: sensor.garten_temperatur
+                  options:
+                    type: sensor
+                    name: Temperatur
+                    icon: mdi:thermometer
+                    graph: line
+                    detail: 2
 
-          - type: sensor
-            entity: sensor.garten_wasserfullstand
-            name: Wasserfüllstand
-            icon: mdi:cup-water
-            graph: line
-            detail: 2
+                - entity_id: sensor.garten_wasserfullstand
+                  options:
+                    type: sensor
+                    name: Wasserfüllstand
+                    icon: mdi:water
+                    graph: line
+                    detail: 2
 
-          - type: sensor
-            entity: sensor.garten_wassertank
-            name: Wassertank
-            icon: mdi:gauge
-            graph: line
-            detail: 2
+                - entity_id: sensor.garten_wasserfüllstand
+                  options:
+                    type: sensor
+                    name: Wasserfüllstand
+                    icon: mdi:water
+                    graph: line
+                    detail: 2
 
-          - type: sensor
-            entity: sensor.garten_wasserabstand
-            name: Wasserabstand
-            icon: mdi:arrow-expand-vertical
-            graph: line
-            detail: 2
+                - entity_id: sensor.garten_wassertank
+                  options:
+                    type: sensor
+                    name: Wassertank
+                    icon: mdi:water-percent
+                    graph: line
+                    detail: 2
 
-          - type: sensor
-            entity: sensor.garten_durchfluss
-            name: Durchfluss
-            icon: mdi:waves-arrow-right
-            graph: line
-            detail: 2
+                - entity_id: sensor.garten_wasserabstand
+                  options:
+                    type: sensor
+                    name: Wasserabstand
+                    icon: mdi:arrow-expand-vertical
+                    graph: line
+                    detail: 2
+
+                - entity_id: sensor.garten_telemetry_water_table_range
+                  options:
+                    type: sensor
+                    name: Wasserabstand
+                    icon: mdi:arrow-expand-vertical
+                    graph: line
+                    detail: 2
+
+                - entity_id: sensor.garten_durchfluss
+                  options:
+                    type: sensor
+                    name: Durchfluss
+                    icon: mdi:waves-arrow-right
+                    graph: line
+                    detail: 2
+
+                - entity_id: sensor.garten_telemetry_flow_rate
+                  options:
+                    type: sensor
+                    name: Durchfluss
+                    icon: mdi:waves-arrow-right
+                    graph: line
+                    detail: 2
+
+                - entity_id: sensor.garten_rssi
+                  options:
+                    type: sensor
+                    name: WLAN
+                    icon: mdi:wifi
+                    graph: line
+                    detail: 2
+
+                - entity_id: sensor.garten_telemetry_wifi_strength
+                  options:
+                    type: sensor
+                    name: WLAN
+                    icon: mdi:wifi
+                    graph: line
+                    detail: 2
+
+              exclude:
+                - state: unavailable
+                - state: unknown
+                - entity_id: "*timestamp*"
+                - entity_id: "*last_hour*"
+                - entity_id: "*last_7d*"
+                - entity_id: "*api_user*"
+                - entity_id: "*owner*"
+                - entity_id: "*token*"
+                - entity_id: "*preview*"
+                - entity_id: "*truncated*"
+
+            sort:
+              method: name
 
       - type: grid
         cards:
@@ -172,19 +250,19 @@
             heading: 24h Verlauf
 
           - type: history-graph
-            title: Batterie / Temperatur / Wasser
+            title: Batterie / Temperatur / Tank
             hours_to_show: 24
             entities:
               - entity: sensor.garten_batterie
                 name: Batterie
               - entity: sensor.garten_temperatur
                 name: Temperatur
+              - entity: sensor.garten_wasserabstand
+                name: Wasserabstand
               - entity: sensor.garten_wasserfullstand
                 name: Wasserfüllstand
               - entity: sensor.garten_wassertank
                 name: Wassertank
-              - entity: sensor.garten_wasserabstand
-                name: Wasserabstand
 
           - type: history-graph
             title: Bewässerung
@@ -203,61 +281,83 @@
             icon: mdi:water-pump
             heading: Bewässerung
 
-          - type: tile
-            entity: switch.garten_pumpe
-            name: Pumpe
-            icon: mdi:water-pump
-            color: blue
-            tap_action:
-              action: toggle
+          - type: custom:auto-entities
+            card:
+              type: grid
+              columns: 2
+              square: false
+            card_param: cards
+            filter:
+              include:
+                - entity_id: switch.garten_pumpe
+                  options:
+                    type: tile
+                    name: Pumpe
+                    icon: mdi:water-pump
+                    color: blue
+                    tap_action:
+                      action: toggle
 
-          - type: tile
-            entity: sensor.garten_pumpenstatus
-            name: Pumpenstatus
-            icon: mdi:pump
-            color: blue
+                - entity_id: sensor.garten_pumpenstatus*
+                  options:
+                    type: tile
+                    icon: mdi:pump
+                    color: blue
 
-          - type: tile
-            entity: sensor.garten_pumpenstatus_gemeldet
-            name: Gemeldet
-            icon: mdi:pump
-            color: blue
+                - entity_id: sensor.garten_pumpen_abgleich
+                  options:
+                    type: tile
+                    name: Pumpen-Abgleich
+                    icon: mdi:sync
+                    color: blue
 
-          - type: tile
-            entity: sensor.garten_pumpenstatus_gewunscht
-            name: Gewünscht
-            icon: mdi:pump-outline
-            color: blue
+                - entity_id: sensor.garten_nachfull*
+                  options:
+                    type: tile
+                    icon: mdi:calendar-refresh
+                    color: cyan
 
-          - type: tile
-            entity: sensor.garten_pumpen_abgleich
-            name: Pumpen-Abgleich
-            icon: mdi:sync
-            color: blue
+                - entity_id: sensor.garten_nachfüll*
+                  options:
+                    type: tile
+                    icon: mdi:calendar-refresh
+                    color: cyan
 
-          - type: tile
-            entity: sensor.garten_nachfullzeit
-            name: Nachfüllzeit
-            icon: mdi:clock-outline
-            color: cyan
+                - entity_id: sensor.garten_nachste*
+                  options:
+                    type: tile
+                    icon: mdi:calendar-clock
+                    color: blue
 
-          - type: tile
-            entity: sensor.garten_nachfullintervall
-            name: Nachfüllintervall
-            icon: mdi:calendar-refresh
-            color: cyan
+                - entity_id: sensor.garten_nächste*
+                  options:
+                    type: tile
+                    icon: mdi:calendar-clock
+                    color: blue
 
-          - type: tile
-            entity: sensor.garten_nachste_bewaesserung
-            name: Nächste Bewässerung
-            icon: mdi:calendar-clock
-            color: blue
+                - entity_id: sensor.garten_maximale_pumpdauer
+                  options:
+                    type: tile
+                    icon: mdi:timer-outline
+                    color: cyan
 
-          - type: tile
-            entity: sensor.garten_maximale_pumpdauer
-            name: Maximale Pumpdauer
-            icon: mdi:timer-outline
-            color: cyan
+                - entity_id: sensor.garten_zuletzt_getrankt*
+                  options:
+                    type: tile
+                    icon: mdi:watering-can
+                    color: blue
+
+              exclude:
+                - state: unavailable
+                - state: unknown
+                - entity_id: "*timestamp*"
+                - entity_id: "*telemetry*_timestamp"
+                - entity_id: "*api_user*"
+                - entity_id: "*owner*"
+                - entity_id: "*token*"
+
+            sort:
+              method: name
 
       - type: grid
         cards:
@@ -278,32 +378,36 @@
                     type: tile
                     icon: mdi:watering-can
                     color: blue
+
                 - entity_id: sensor.garten_pflanzcontainer_*_zuletzt_bewaessert
                   options:
                     type: tile
                     icon: mdi:watering-can
                     color: blue
+
                 - entity_id: sensor.garten_pflanzcontainer_*_zuletzt_bewässert
                   options:
                     type: tile
                     icon: mdi:watering-can
                     color: blue
+
               exclude:
+                - state: unavailable
+                - state: unknown
                 - entity_id: "*timestamp*"
                 - entity_id: "*telemetry*"
                 - entity_id: "*api_user*"
                 - entity_id: "*owner*"
                 - entity_id: "*token*"
-                - entity_id: "*preview*"
-                - entity_id: "*truncated*"
+
             sort:
               method: name
 
       - type: grid
         cards:
           - type: heading
-            icon: mdi:gauge
-            heading: Tank & Gerät
+            icon: mdi:water
+            heading: Tank
 
           - type: custom:auto-entities
             card:
@@ -319,73 +423,162 @@
                     name: Wasserfüllstand
                     icon: mdi:cup-water
                     color: blue
+
                 - entity_id: sensor.garten_wasserfüllstand
                   options:
                     type: tile
                     name: Wasserfüllstand
                     icon: mdi:cup-water
                     color: blue
+
                 - entity_id: sensor.garten_wassertank
                   options:
                     type: tile
                     name: Wassertank
-                    icon: mdi:gauge
+                    icon: mdi:water-percent
                     color: blue
+
                 - entity_id: sensor.garten_wasserabstand
                   options:
                     type: tile
                     name: Wasserabstand
                     icon: mdi:arrow-expand-vertical
                     color: cyan
-                - entity_id: sensor.garten_rssi
+
+                - entity_id: sensor.garten_telemetry_water_table_range
                   options:
                     type: tile
-                    name: WLAN
-                    icon: mdi:wifi
-                    color: blue
-                - entity_id: sensor.garten_wifi_strength
+                    name: Wasserabstand
+                    icon: mdi:arrow-expand-vertical
+                    color: cyan
+
+                - entity_id: sensor.garten_durchfluss
                   options:
                     type: tile
-                    name: WLAN
-                    icon: mdi:wifi
-                    color: blue
+                    name: Durchfluss
+                    icon: mdi:waves-arrow-right
+                    color: cyan
+
+                - entity_id: sensor.garten_telemetry_flow_rate
+                  options:
+                    type: tile
+                    name: Durchfluss
+                    icon: mdi:waves-arrow-right
+                    color: cyan
+
+              exclude:
+                - state: unavailable
+                - state: unknown
+                - entity_id: "*timestamp*"
+                - entity_id: "*last_hour*"
+                - entity_id: "*last_7d*"
+                - entity_id: "*api_user*"
+                - entity_id: "*owner*"
+                - entity_id: "*token*"
+
+            sort:
+              method: name
+
+      - type: grid
+        cards:
+          - type: heading
+            icon: mdi:chip
+            heading: Gerät
+
+          - type: custom:auto-entities
+            card:
+              type: grid
+              columns: 2
+              square: false
+            card_param: cards
+            filter:
+              include:
                 - entity_id: sensor.garten_firmware
                   options:
                     type: tile
                     icon: mdi:chip
                     color: grey
+
+                - entity_id: sensor.garten_status
+                  options:
+                    type: tile
+                    icon: mdi:information-outline
+                    color: grey
+
                 - entity_id: sensor.garten_leckage_erkennung
                   options:
                     type: tile
                     icon: mdi:pipe-leak
                     color: red
-                - entity_id: sensor.garten_batteriespannung
+
+                - entity_id: sensor.garten_rssi
                   options:
                     type: tile
-                    icon: mdi:battery-charging
-                    color: green
-                - entity_id: sensor.garten_solarspannung
+                    name: WLAN Signal
+                    icon: mdi:wifi
+                    color: blue
+
+                - entity_id: sensor.garten_telemetry_wifi_strength
                   options:
                     type: tile
-                    icon: mdi:solar-power
-                    color: amber
-                - entity_id: sensor.garten_esp_temperatur
+                    name: WLAN Signal
+                    icon: mdi:wifi
+                    color: blue
+
+                - entity_id: sensor.garten_telemetry_temperature_esp
                   options:
                     type: tile
+                    name: ESP Temperatur
                     icon: mdi:chip
                     color: orange
+
+                - entity_id: sensor.garten_telemetry_battery_voltage
+                  options:
+                    type: tile
+                    name: Batteriespannung
+                    icon: mdi:battery-charging
+                    color: green
+
+                - entity_id: sensor.garten_telemetry_battery_voltage_esp
+                  options:
+                    type: tile
+                    name: Batteriespannung ESP
+                    icon: mdi:battery-charging
+                    color: green
+
+                - entity_id: sensor.garten_telemetry_battery_current
+                  options:
+                    type: tile
+                    name: Batteriestrom
+                    icon: mdi:current-dc
+                    color: green
+
+                - entity_id: sensor.garten_telemetry_input_current
+                  options:
+                    type: tile
+                    name: Eingangsstrom
+                    icon: mdi:current-dc
+                    color: green
+
+                - entity_id: sensor.garten_telemetry_solar_voltage
+                  options:
+                    type: tile
+                    name: Solarspannung
+                    icon: mdi:solar-power
+                    color: amber
+
               exclude:
-                - entity_id: "*telemetry*"
+                - state: unavailable
+                - state: unknown
                 - entity_id: "*timestamp*"
                 - entity_id: "*last_hour*"
                 - entity_id: "*last_7d*"
-                - entity_id: "*battery_current*"
-                - entity_id: "*input_current*"
                 - entity_id: "*api_user*"
                 - entity_id: "*owner*"
                 - entity_id: "*token*"
                 - entity_id: "*preview*"
                 - entity_id: "*truncated*"
+
             sort:
               method: name
 
@@ -403,23 +596,42 @@
             card_param: cards
             filter:
               include:
+                - entity_id: button.garten_aktualisieren
+                  options:
+                    type: tile
+                    name: Aktualisieren
+                    icon: mdi:refresh
+                    color: blue
+
+                - entity_id: button.garten_gerat_neu_starten
+                  options:
+                    type: tile
+                    name: Gerät neu starten
+                    icon: mdi:restart
+                    color: blue
+
+                - entity_id: button.garten_gerät_neu_starten
+                  options:
+                    type: tile
+                    name: Gerät neu starten
+                    icon: mdi:restart
+                    color: blue
+
                 - entity_id: button.garten_*
                   options:
                     type: tile
                     color: blue
-                - entity_id: button.*boum*
-                  options:
-                    type: tile
-                    color: blue
+
               exclude:
+                - state: unavailable
+                - state: unknown
                 - entity_id: "*telemetry*"
                 - entity_id: "*timestamp*"
-                - entity_id: "*last_hour*"
-                - entity_id: "*last_7d*"
                 - entity_id: "*api_user*"
                 - entity_id: "*owner*"
                 - entity_id: "*token*"
                 - entity_id: "*preview*"
                 - entity_id: "*truncated*"
+
             sort:
               method: name
