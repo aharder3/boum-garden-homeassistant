@@ -30,33 +30,35 @@
                       [[[
                         const friendly = entity.attributes.friendly_name || "";
                         const entityId = entity.entity_id || "";
-
-                        let match =
-                          friendly.match(/(\d{1,2})$/) ||
-                          entityId.match(/_(\d{1,2})$/);
-
-                        if (match) {
-                          return `Pflanzcontainer ${match[1].padStart(2, "0")}`;
-                        }
-
-                        return friendly
-                          .replace(/^Garten\s+/i, "")
-                          .replace(/Pflanzcontainer\s*/i, "Pflanzcontainer ");
+                        const match = friendly.match(/(\d{1,2})$/) || entityId.match(/_(\d{1,2})$/);
+                        if (match) return `Pflanzcontainer ${match[1].padStart(2, "0")}`;
+                        return friendly.replace(/^Garten\s+/i, "").replace(/Pflanzcontainer\s*/i, "Pflanzcontainer ");
                       ]]]
                     label: |
                       [[[
-                        const names =
-                          entity.attributes.plant_names ||
-                          entity.attributes.pflanzen ||
-                          entity.attributes.plants ||
-                          entity.state;
-
-                        if (Array.isArray(names)) {
-                          return names.join(", ");
-                        }
-
+                        const names = entity.attributes.plant_names || entity.attributes.pflanzen || entity.attributes.plants || entity.state;
+                        if (Array.isArray(names)) return names.join(", ");
                         return names || "";
                       ]]]
+                    custom_fields:
+                      badges: |
+                        [[[
+                          const imgs = entity.attributes.image_urls || entity.attributes.images || [];
+                          const arr = Array.isArray(imgs) ? imgs : (imgs ? [imgs] : []);
+                          if (arr.length <= 1) return "";
+                          return `<div style="display:flex; gap:4px; justify-content:flex-end; padding:10px;">` +
+                            arr.slice(1, 4).map(img => `
+                              <img src="${img}" style="
+                                width:34px;
+                                height:34px;
+                                border-radius:50%;
+                                object-fit:cover;
+                                border:2px solid rgba(255,255,255,.9);
+                                box-shadow:0 2px 8px rgba(0,0,0,.45);
+                              ">
+                            `).join("") +
+                            `</div>`;
+                        ]]]
                     styles:
                       card:
                         - border-radius: 22px
@@ -64,33 +66,26 @@
                         - padding: 0
                         - background: |
                             [[[
-                              const imgs =
-                                entity.attributes.image_urls ||
-                                entity.attributes.images ||
-                                entity.attributes.image_url ||
-                                "";
-
+                              const imgs = entity.attributes.image_urls || entity.attributes.images || entity.attributes.image_url || "";
                               let img = "";
-
-                              if (Array.isArray(imgs) && imgs.length > 0) {
-                                img = imgs[0];
-                              } else if (typeof imgs === "string") {
-                                img = imgs;
-                              }
-
+                              if (Array.isArray(imgs) && imgs.length > 0) img = imgs[0];
+                              else if (typeof imgs === "string") img = imgs;
                               if (img) {
                                 return `linear-gradient(to bottom, rgba(0,0,0,0.04), rgba(0,0,0,0.72)), url("${img}")`;
                               }
-
                               return "linear-gradient(145deg, #dff5e4, #ffffff)";
                             ]]]
                         - background-size: cover
                         - background-position: center
                         - box-shadow: 0 10px 24px rgba(0,0,0,0.18)
                       grid:
-                        - grid-template-areas: '"n" "l"'
-                        - grid-template-rows: 1fr min-content
+                        - grid-template-areas: '"badges" "n" "l"'
+                        - grid-template-rows: min-content 1fr min-content
                         - height: 100%
+                      custom_fields:
+                        badges:
+                          - align-self: start
+                          - justify-self: stretch
                       name:
                         - align-self: end
                         - justify-self: start
@@ -109,7 +104,213 @@
                         - text-align: left
                         - text-shadow: 0 2px 8px rgba(0,0,0,0.85)
                     tap_action:
-                      action: more-info
+                      action: fire-dom-event
+                      browser_mod:
+                        service: browser_mod.popup
+                        data:
+                          title: |
+                            [[[
+                              const friendly = entity.attributes.friendly_name || "";
+                              const id = entity.entity_id || "";
+                              const match = friendly.match(/(\d{1,2})$/) || id.match(/_(\d{1,2})$/);
+                              if (match) return `Pflanzcontainer ${match[1].padStart(2, "0")}`;
+                              return friendly || id;
+                            ]]]
+                          content:
+                            type: vertical-stack
+                            cards:
+                              - type: custom:bubble-card
+                                card_type: separator
+                                name: Pflanzen & Pflege
+                                icon: mdi:flower-tulip
+                              - type: custom:button-card
+                                entity: |
+                                  [[[
+                                    return entity.entity_id;
+                                  ]]]
+                                show_icon: false
+                                show_name: false
+                                show_state: false
+                                styles:
+                                  card:
+                                    - border-radius: 22px
+                                    - padding: 16px
+                                    - box-shadow: none
+                                  grid:
+                                    - grid-template-areas: '"content"'
+                                  custom_fields:
+                                    content:
+                                      - text-align: left
+                                      - white-space: normal
+                                custom_fields:
+                                  content: |
+                                    [[[
+                                      const a = entity.attributes || {};
+
+                                      const asArray = (v) => {
+                                        if (!v) return [];
+                                        if (Array.isArray(v)) return v;
+                                        return [v];
+                                      };
+
+                                      const clean = (v) => {
+                                        if (v === undefined || v === null) return "";
+                                        if (Array.isArray(v)) return v.filter(Boolean).join(", ");
+                                        if (typeof v === "object") {
+                                          if (v.de) return v.de;
+                                          if (v.en) return v.en;
+                                          return Object.values(v).filter(Boolean).join(", ");
+                                        }
+                                        return String(v);
+                                      };
+
+                                      const names = asArray(a.plant_names || a.pflanzen || a.names || entity.state);
+                                      const images = asArray(a.image_urls || a.images || a.image_url);
+                                      const latin = asArray(a.latin_names || a.latin_name);
+                                      const water = asArray(a.water_classes || a.water_class || a.water || a.water_usage);
+                                      const light = asArray(a.light_types || a.light_type || a.light);
+                                      const soil = asArray(a.soil_types || a.soil_type || a.soil);
+                                      const nutrients = asArray(a.nutrients || a.nutrient_types);
+                                      const tempMin = asArray(a.min_temperatures || a.min_temperature || a.minTemperature);
+                                      const tempMax = asArray(a.max_temperatures || a.max_temperature || a.maxTemperature);
+
+                                      const careFields = [
+                                        a.general_care_descriptions,
+                                        a.generalCareDescription,
+                                        a.water_care_descriptions,
+                                        a.waterCareDescription,
+                                        a.light_care_descriptions,
+                                        a.lightCareDescription,
+                                        a.soil_care_descriptions,
+                                        a.soilCareDescription,
+                                        a.temperature_care_descriptions,
+                                        a.temperatureCareDescription,
+                                        a.fertilizer_care_descriptions,
+                                        a.fertilizerCareDescription,
+                                        a.care_descriptions,
+                                      ];
+
+                                      let care = [];
+                                      careFields.forEach(v => {
+                                        asArray(v).forEach(x => {
+                                          const txt = clean(x);
+                                          if (txt && !care.includes(txt)) care.push(txt);
+                                        });
+                                      });
+
+                                      // Falls die Integration eine echte plants-Liste als Attribut liefert,
+                                      // wird pro Pflanze eine separate Box gebaut.
+                                      let plants = [];
+                                      if (Array.isArray(a.plants) && typeof a.plants[0] === "object") {
+                                        plants = a.plants;
+                                      } else if (Array.isArray(a.plant_details) && typeof a.plant_details[0] === "object") {
+                                        plants = a.plant_details;
+                                      }
+
+                                      if (!plants.length) {
+                                        const maxLen = Math.max(names.length, images.length, latin.length, water.length, light.length, soil.length, nutrients.length, tempMin.length, tempMax.length, 1);
+                                        for (let i = 0; i < maxLen; i++) {
+                                          plants.push({
+                                            name: names[i] || names[0] || entity.state,
+                                            imageUrl: images[i] || images[0] || "",
+                                            latinName: latin[i] || "",
+                                            waterClass: water[i] || water[0] || "",
+                                            lightType: light[i] || light[0] || "",
+                                            soilType: soil[i] || soil[0] || "",
+                                            nutrients: nutrients[i] || nutrients[0] || "",
+                                            minTemperature: tempMin[i] || tempMin[0] || "",
+                                            maxTemperature: tempMax[i] || tempMax[0] || "",
+                                          });
+                                        }
+                                      }
+
+                                      const plantCards = plants.map((p, i) => {
+                                        const translated = p.nameTranslated?.de || p.translated?.de || p.nameTranslated?.en || p.translated?.en;
+                                        const name = clean(translated || p.name || p.plant_name || p.displayName || names[i] || entity.state);
+                                        const img = clean(p.imageUrl || p.image_url || p.image || images[i] || images[0] || "");
+                                        const latinName = clean(p.latinName || p.latin_name || latin[i] || "");
+                                        const waterText = clean(p.waterClass || p.water_class || p.water || p.waterTranslated?.de || water[i] || "");
+                                        const usage = clean(p.waterUsage || p.water_usage || "");
+                                        const lightText = clean(p.lightType || p.light_type || p.lightTypeTranslated?.de || light[i] || "");
+                                        const soilText = clean(p.soilType || p.soil_type || p.soilTypeTranslated?.de || soil[i] || "");
+                                        const nutrientText = clean(p.nutrients || p.nutrientsTranslated?.de || nutrients[i] || "");
+                                        const minT = clean(p.minPreferedTemperature || p.minTemperature || tempMin[i] || "");
+                                        const maxT = clean(p.maxPreferedTemperature || p.maxTemperature || tempMax[i] || "");
+
+                                        const careParts = [
+                                          p.generalCareDescriptionTranslated?.de,
+                                          p.generalCareDescription,
+                                          p.waterCareDescriptionTranslated?.de,
+                                          p.waterCareDescription,
+                                          p.lightCareDescriptionTranslated?.de,
+                                          p.lightCareDescription,
+                                          p.soilCareDescriptionTranslated?.de,
+                                          p.soilCareDescription,
+                                          p.temperatureCareDescriptionTranslated?.de,
+                                          p.temperatureCareDescription,
+                                          p.fertilizerCareDescriptionTranslated?.de,
+                                          p.fertilizerCareDescription,
+                                        ].map(clean).filter(Boolean);
+
+                                        return `
+                                          <div style="
+                                            border-radius:20px;
+                                            overflow:hidden;
+                                            margin-bottom:14px;
+                                            background:rgba(0,0,0,.035);
+                                          ">
+                                            ${img ? `<img src="${img}" style="width:100%; max-height:260px; object-fit:cover; display:block;">` : ""}
+                                            <div style="padding:14px;">
+                                              <div style="font-size:20px; font-weight:800; margin-bottom:4px;">${name}</div>
+                                              ${latinName ? `<div style="opacity:.7; font-style:italic; margin-bottom:10px;">${latinName}</div>` : ""}
+                                              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+                                                ${waterText ? `<div><b>💧 Wasser</b><br>${waterText}${usage ? ` · ${usage}` : ""}</div>` : ""}
+                                                ${lightText ? `<div><b>☀️ Licht</b><br>${lightText}</div>` : ""}
+                                                ${soilText ? `<div><b>🌱 Erde</b><br>${soilText}</div>` : ""}
+                                                ${nutrientText ? `<div><b>🧪 Nährstoffe</b><br>${nutrientText}</div>` : ""}
+                                                ${(minT || maxT) ? `<div><b>🌡️ Temperatur</b><br>${minT || "–"} bis ${maxT || "–"} °C</div>` : ""}
+                                              </div>
+                                              ${careParts.length ? `
+                                                <details style="margin-top:10px;">
+                                                  <summary style="font-weight:800; cursor:pointer;">Pflegehinweise anzeigen</summary>
+                                                  <div style="margin-top:10px; line-height:1.45;">
+                                                    ${careParts.map(x => `<p>${x.replace(/\n/g, "<br>")}</p>`).join("")}
+                                                  </div>
+                                                </details>
+                                              ` : ""}
+                                            </div>
+                                          </div>
+                                        `;
+                                      }).join("");
+
+                                      const genericCare = care.length ? `
+                                        <div style="margin-top:12px; padding:14px; border-radius:18px; background:rgba(0,0,0,.035);">
+                                          <div style="font-weight:800; font-size:16px; margin-bottom:8px;">Weitere Pflegehinweise</div>
+                                          ${care.map(x => `<p style="line-height:1.45;">${x.replace(/\n/g, "<br>")}</p>`).join("")}
+                                        </div>
+                                      ` : "";
+
+                                      return `
+                                        <div style="font-size:14px;">
+                                          ${plantCards}
+                                          ${genericCare}
+                                          <div style="opacity:.55; font-size:12px; margin-top:10px;">
+                                            Quelle: Boum API / plantContainerId-Gruppierung. Bei mehreren Pflanzen werden die Pflanzen einzeln dargestellt, sofern die Attribute dies hergeben.
+                                          </div>
+                                        </div>
+                                      `;
+                                    ]]]
+                              - type: custom:bubble-card
+                                card_type: separator
+                                name: Home-Assistant-Details
+                                icon: mdi:information-outline
+                              - type: entities
+                                entities:
+                                  - entity: |
+                                      [[[
+                                        return entity.entity_id;
+                                      ]]]
+                                    name: Pflanzcontainer
 
               exclude:
                 - entity_id: sensor.garten_pflanzcontainer_*_zuletzt_bewassert
