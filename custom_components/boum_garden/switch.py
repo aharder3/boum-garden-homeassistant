@@ -14,6 +14,8 @@ from .api import BoumApiClient
 from .coordinator import BoumGardenDataUpdateCoordinator
 from .helpers import desired_state, device_info, find_value, reported_state
 
+PUMP_STATE_KEYS = ("pumpState", "pump_state", "pump", "pumping", "pumpOn", "pump_on", "isPumping")
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -70,12 +72,12 @@ class BoumPumpSwitch(CoordinatorEntity[BoumGardenDataUpdateCoordinator], SwitchE
         desired = desired_state(self._device)
         # Prefer desired state so a manual switch command is visible immediately,
         # even if the device reports its physical state later.
-        value = find_value(desired, ("pumpState", "pump_state"))
+        value = find_value(desired, PUMP_STATE_KEYS)
         if value is None:
-            value = find_value(reported, ("pumpState", "pump_state"))
+            value = find_value(reported, PUMP_STATE_KEYS)
         if value is None:
             return None
-        return str(value).lower() in {"on", "true", "1", "open", "running"}
+        return str(value).strip().lower() in {"on", "true", "1", "open", "running", "active", "pumping"}
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn pump on."""

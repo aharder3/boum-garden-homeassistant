@@ -148,7 +148,7 @@ class BoumGardenOptionsFlow(config_entries.OptionsFlow):
     """Handle Boum Garden options."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
+        self._config_entry = config_entry
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         """Manage options."""
@@ -156,9 +156,9 @@ class BoumGardenOptionsFlow(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=user_input)
 
         current = int(
-            self.config_entry.options.get(
+            self._config_entry.options.get(
                 CONF_SCAN_INTERVAL,
-                self.config_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS),
+                self._config_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS),
             )
         )
         return self.async_show_form(

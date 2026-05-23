@@ -149,3 +149,10 @@ The public Boum API documentation does not define every possible reported teleme
 The full raw payload is available via Home Assistant diagnostics. If the plant names are not in diagnostics either, the public API currently does not expose them to this integration.
 
 If Boum exposes plant objects such as `plants[0].moisture`, they should appear in the plant summary and as dynamic sensors after a Home Assistant restart/reload. If a new field only appears later, reload the integration so Home Assistant can create the new entity.
+
+
+## 0.1.4
+
+- Fix Home Assistant 2026 OptionsFlow compatibility.
+- Fix sensor platform import error caused by `_normalise_key` initialisation order.
+- Broaden pump-state aliases and keep old/invalid timestamps out of entity states.

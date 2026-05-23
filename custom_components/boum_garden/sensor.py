@@ -43,7 +43,7 @@ class BoumValueSensorDescription(SensorEntityDescription):
     source_order: tuple[str, ...] = ("reported", "telemetry", "desired")
 
 
-PUMP_STATE_KEYS = ("pumpState", "pump_state")
+PUMP_STATE_KEYS = ("pumpState", "pump_state", "pump", "pumping", "pumpOn", "pump_on", "isPumping")
 LAST_WATERING_KEYS = (
     "lastPumped",
     "lastPump",
@@ -300,6 +300,15 @@ SENSOR_DESCRIPTIONS: tuple[BoumValueSensorDescription, ...] = (
         source_order=("desired", "reported", "telemetry"),
     ),
 )
+
+
+def _normalise_key(text: str) -> str:
+    """Normalise API field names for matching/filtering.
+
+This helper is used while module-level constants are created, so it must be
+defined before KNOWN_SENSOR_KEYS.
+    """
+    return re.sub(r"[^a-z0-9]+", "", str(text).lower())
 
 KNOWN_SENSOR_KEYS = {
     _normalise_key(key)
@@ -948,6 +957,3 @@ def _value_is_reasonable_dynamic(value: Any) -> bool:
         return False
     return True
 
-
-def _normalise_key(text: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "", text.lower())
