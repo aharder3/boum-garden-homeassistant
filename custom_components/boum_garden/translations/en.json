@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Boum Garden",
-        "description": "Connects Home Assistant directly to the Boum IoT REST API. You can also select the tank size during setup. The 35 L tank uses Boum's frontend formula. For the 55 L/custom tank, add empty/full distances to calculate litres/percent until Boum provides the 55 L formula. Note: “local” is a local development/proxy endpoint according to the Boum CLI docs, not automatically the plant device IP.",
+        "description": "Connects Home Assistant directly to the Boum IoT REST API. You can also select the tank size during setup. Supported presets are 32 L, 35 L, 55 L and custom tanks. Note: “local” is a local development/proxy endpoint according to the Boum CLI docs, not automatically the plant device IP.",
         "data": {
           "email": "Email",
           "password": "Password",
@@ -49,7 +49,7 @@
           "tank_empty_distance_cm": "Sensor distance when tank is empty in cm",
           "tank_full_distance_cm": "Sensor distance when tank is full in cm"
         },
-        "description": "Optional local plant data is only used when Boum does not expose plant names through the API. For water level: choose the tank size. The 35 L tank uses the Boum frontend formula. The 55 L/custom tank needs empty/full distance values until Boum exposes the 55 L formula or tank metadata through the API."
+        "description": "Optional local plant data is only used when Boum does not expose plant names through the API. For water level: choose the tank size. 32 L and 35 L use the Boum frustum formula family from waterTableRange. 55 L uses the cylinder formula. Custom tanks need empty/full distance values."
       }
     }
   },

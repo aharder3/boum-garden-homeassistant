@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Boum Garden",
-        "description": "Verbindet Home Assistant direkt mit der Boum IoT REST-API. Wähle hier auch direkt deine Tankgrösse. Für Liter-Berechnung zusätzlich die Sensor-Abstände bei leerem und vollem Tank eintragen. Hinweis: „local“ ist gemäss Boum-CLI-Doku ein lokaler Entwicklungs-/Proxy-Endpunkt, nicht automatisch die IP des Pflanzgeräts.",
+        "description": "Verbindet Home Assistant direkt mit der Boum IoT REST-API. Wähle hier auch direkt deine Tankgrösse. Unterstützt werden 32 L, 35 L, 55 L und benutzerdefinierte Tanks. Hinweis: „local“ ist gemäss Boum-CLI-Doku ein lokaler Entwicklungs-/Proxy-Endpunkt, nicht automatisch die IP des Pflanzgeräts.",
         "data": {
           "email": "E-Mail",
           "password": "Passwort",
@@ -49,7 +49,7 @@
           "tank_empty_distance_cm": "Sensor-Abstand bei leerem Tank in cm",
           "tank_full_distance_cm": "Sensor-Abstand bei vollem Tank in cm"
         },
-        "description": "Optionale lokale Pflanzendaten werden nur verwendet, wenn Boum keine Pflanzennamen über die API liefert. Für den Wasserfüllstand: Tankgrösse wählen. Der grosse 35-L-Tank nutzt die Boum-Frontend-Formel aus waterTableRange. Für den 55-L- oder benutzerdefinierten Tank sind leer/voll-Distanzwerte nötig, bis Boum die 55-L-Formel oder Tankdaten per API liefert."
+        "description": "Optionale lokale Pflanzendaten werden nur verwendet, wenn Boum keine Pflanzennamen über die API liefert. Für den Wasserfüllstand: Tankgrösse wählen. 32 L und 35 L nutzen die Boum-Kegelstumpf-Formelfamilie aus waterTableRange. 55 L nutzt die Zylinderformel. Benutzerdefinierte Tanks benötigen leer/voll-Distanzwerte."
       }
     }
   },

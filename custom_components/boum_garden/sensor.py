@@ -847,6 +847,90 @@ def _boum_35l_liters_from_distance(distance_cm: float) -> tuple[float, dict[str,
     }
 
 
+
+
+def _boum_32l_liters_from_distance(distance_cm: float) -> tuple[float, dict[str, Any]]:
+    """Calculate the Boum 32 L tank level from waterTableRange.
+
+    Boum has not provided a separate 32 L frontend formula yet. The 32 L tank
+    is therefore calculated from the same frustum formula family as the 35 L
+    tank and scaled by 32/35. This keeps the curve plausible while clearly
+    exposing the source in attributes. Replace this with Boum's official 32 L
+    formula when available.
+    """
+    liters_35, meta_35 = _boum_35l_liters_from_distance(distance_cm)
+    raw_liters = float(meta_35.get("formula_raw_liters", liters_35)) * (32.0 / 35.0)
+    liters = round(_clamp(raw_liters, 0.0, 32.0), 1)
+    percent = round(_clamp(liters / 32.0 * 100.0, 0.0, 100.0), 1)
+    return liters, {
+        "source": "boum_32l_scaled_from_35l_frustum_formula",
+        "api_distance_cm": distance_cm,
+        "tank_preset": "tank_32l",
+        "tank_volume_liters": 32.0,
+        "formula_raw_liters": round(raw_liters, 3),
+        "calculated_percent": percent,
+        "calculation": "32/35 * Boum 35 L frustum formula",
+        "note": "Provisional 32 L calculation using the 35 L frustum formula family scaled to 32 L. Replace when Boum provides the official 32 L formula.",
+    }
+
+
+def _boum_55l_liters_from_distance(distance_cm: float) -> tuple[float, dict[str, Any]]:
+    """Calculate the 55 L cylinder tank level from waterTableRange.
+
+    Geometry supplied by Boum/user:
+      - tank height: 72 cm
+      - tank diameter: 40 cm
+      - usable volume: 55 L
+
+    The measured waterTableRange is the distance from the sensor to the water
+    surface, not the physical tank height. For the 55 L tank we therefore use a
+    cylindrical volume formula with radius 20 cm and an effective sensor-to-
+    bottom distance calibrated from the current verified app/API point:
+
+      waterTableRange 15.2583333333333 cm = 44 L
+
+    Formula:
+      L = (sensor_to_bottom_cm - d) * pi * r^2 / 1000
+
+    with r=20 cm and sensor_to_bottom_cm derived from the 44 L calibration
+    point. This keeps the calculation geometry-based and aligned with the
+    known 55 L tank dimensions.
+    """
+    d = float(distance_cm)
+    radius_cm = 20.0
+    pi = 3.14
+    volume_liters = 55.0
+    liters_per_cm = pi * radius_cm * radius_cm / 1000.0
+
+    calibration_distance_cm = 15.2583333333333
+    calibration_liters = 44.0
+    sensor_to_bottom_cm = calibration_distance_cm + (calibration_liters / liters_per_cm)
+    full_water_height_cm = volume_liters / liters_per_cm
+    full_distance_cm = sensor_to_bottom_cm - full_water_height_cm
+    empty_distance_cm = sensor_to_bottom_cm
+
+    raw_liters = (sensor_to_bottom_cm - d) * liters_per_cm
+    liters = round(_clamp(raw_liters, 0.0, volume_liters), 1)
+    percent = round(_clamp(liters / volume_liters * 100.0, 0.0, 100.0), 1)
+    return liters, {
+        "source": "boum_55l_cylinder_geometry_calibrated",
+        "api_distance_cm": distance_cm,
+        "tank_preset": "tank_55l",
+        "tank_volume_liters": volume_liters,
+        "tank_height_cm": 72.0,
+        "tank_diameter_cm": 40.0,
+        "effective_radius_cm": radius_cm,
+        "sensor_to_bottom_cm": round(sensor_to_bottom_cm, 3),
+        "calculated_full_distance_cm": round(full_distance_cm, 3),
+        "calculated_empty_distance_cm": round(empty_distance_cm, 3),
+        "liters_per_cm": round(liters_per_cm, 6),
+        "formula_raw_liters": round(raw_liters, 3),
+        "calculated_percent": percent,
+        "calibration_point": "waterTableRange 15.2583333333333 cm = 44 L",
+        "calculation": "L=(sensor_to_bottom_cm-d)*3.14*20^2/1000; clamped 0..55",
+        "note": "55 L cylinder tank calculation based on tank diameter 40 cm and one verified app/API calibration point.",
+    }
+
 def _generic_percent_from_distance(
     distance_cm: float | None,
     empty_cm: float | None,
@@ -878,10 +962,7 @@ def _normalise_tank_preset(value: Any) -> str:
     if preset == "large_35l":
         return "tank_35l"
     if preset == "small_32l":
-        # Legacy value from early builds. Boum currently uses 35 L and 55 L tanks,
-        # so keep existing users on the known 35 L formula instead of showing a
-        # non-existent 32 L preset. Users with a 55 L tank should select tank_55l.
-        return "tank_35l"
+        return "tank_32l"
     return preset
 
 def _water_liters_from_distance(options: Mapping[str, Any], device: Mapping[str, Any]) -> tuple[float | None, dict[str, Any]]:
@@ -890,7 +971,7 @@ def _water_liters_from_distance(options: Mapping[str, Any], device: Mapping[str,
     Priority:
     1. Direct named litres from Boum, if ever exposed.
     2. Boum-provided 35 L tank frontend formula from waterTableRange.
-    3. Generic distance calculation for 55 L/custom tanks when empty/full
+    3. 32 L scaled frustum formula, 55 L cylinder geometry calculation, or generic custom tanks when empty/full
        calibration distances are configured.
     """
     direct = _direct_water_liters(device)
@@ -900,8 +981,12 @@ def _water_liters_from_distance(options: Mapping[str, Any], device: Mapping[str,
     distance = _water_distance_cm(device)
     preset = _normalise_tank_preset(options.get(CONF_TANK_PRESET, "custom"))
 
+    if preset == "tank_32l" and distance is not None:
+        return _boum_32l_liters_from_distance(distance)
     if preset == "tank_35l" and distance is not None:
         return _boum_35l_liters_from_distance(distance)
+    if preset == "tank_55l" and distance is not None:
+        return _boum_55l_liters_from_distance(distance)
 
     preset_volume = TANK_PRESETS.get(preset)
     volume = preset_volume if preset_volume is not None else _tank_option_float(options, CONF_TANK_VOLUME_LITERS)
@@ -915,9 +1000,9 @@ def _water_liters_from_distance(options: Mapping[str, Any], device: Mapping[str,
     }
     if percent is None or volume is None:
         meta["missing"] = (
-            "For the 35 L tank, select tank_35l and no empty/full distance is required. "
-            "For the 55 L or custom tank, configure tank volume plus empty/full distances. "
-            "Boum has not yet provided the 55 L frontend formula."
+            "For the 32 L tank, select tank_32l; for the 35 L tank, select tank_35l. No empty/full distance is required for these presets. "
+            "For the 55 L tank, select tank_55l to use the 55 L cylinder geometry formula. "
+            "For custom tanks, configure tank volume plus empty/full distances."
         )
         return None, meta
     if volume <= 0:
@@ -933,8 +1018,14 @@ def _water_percent_from_distance(options: Mapping[str, Any], device: Mapping[str
     distance = _water_distance_cm(device)
     preset = _normalise_tank_preset(options.get(CONF_TANK_PRESET, "custom"))
 
+    if preset == "tank_32l" and distance is not None:
+        _liters, meta = _boum_32l_liters_from_distance(distance)
+        return meta.get("calculated_percent"), meta
     if preset == "tank_35l" and distance is not None:
         _liters, meta = _boum_35l_liters_from_distance(distance)
+        return meta.get("calculated_percent"), meta
+    if preset == "tank_55l" and distance is not None:
+        _liters, meta = _boum_55l_liters_from_distance(distance)
         return meta.get("calculated_percent"), meta
 
     empty_cm = _tank_option_float(options, CONF_TANK_EMPTY_DISTANCE_CM)
@@ -1013,8 +1104,8 @@ class BoumWaterTankPercentSensor(BoumBaseSensor):
         _percent, meta = _water_percent_from_distance(self.coordinator.options, self._device)
         return meta | {
             "note": (
-                "No phantom value is used. Percent is calculated from Boum's 35 L formula "
-                "or from configured empty/full distances."
+                "No phantom value is used. Percent is calculated from Boum's 35 L formula, "
+                "the 55 L cylinder geometry formula, or from configured empty/full distances."
             )
         }
 

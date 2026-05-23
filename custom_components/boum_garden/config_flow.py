@@ -48,8 +48,10 @@ _LOGGER = logging.getLogger(__name__)
 def _normalise_tank_preset(value: Any) -> str:
     """Normalize current and legacy tank preset values for forms/options."""
     preset = str(value or DEFAULT_TANK_PRESET)
-    if preset in {"large_35l", "small_32l"}:
+    if preset == "large_35l":
         return "tank_35l"
+    if preset == "small_32l":
+        return "tank_32l"
     if preset not in TANK_PRESETS:
         return DEFAULT_TANK_PRESET
     return preset
@@ -256,8 +258,9 @@ class BoumGardenOptionsFlow(config_entries.OptionsFlow):
             description_placeholders={
                 "tank_help": (
                     "Use the main Boum tank volume, not the 2 L pot reservoir. "
-                    "The 35 L tank uses Boum's frontend formula from waterTableRange. "
-                    "For the 55 L or custom tank, set empty/full distances until Boum exposes the 55 L formula."
+                    "The 32 L and 35 L tanks use the Boum frustum formula family from waterTableRange. "
+                    "The 55 L tank uses a cylinder geometry formula based on height 72 cm and diameter 40 cm. "
+                    "Custom tanks use empty/full distance calibration."
                 )
             },
         )

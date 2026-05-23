@@ -36,6 +36,21 @@
                         if (Array.isArray(names)) return names.join(", ");
                         return names || "";
                       ]]]
+                    custom_fields:
+                      thumbs: |
+                        [[[
+                          const imgsRaw = entity.attributes.image_urls || entity.attributes.images || entity.attributes.image_url || [];
+                          const imgs = Array.isArray(imgsRaw) ? imgsRaw : (imgsRaw ? [imgsRaw] : []);
+                          if (imgs.length <= 1) return "";
+                          const visible = imgs.slice(0, 3);
+                          const html = visible.map((img) =>
+                            `<img src="${img}" style="width:34px;height:34px;object-fit:cover;border-radius:50%;border:2px solid rgba(255,255,255,.92);box-shadow:0 2px 8px rgba(0,0,0,.45);margin-left:-8px;">`
+                          ).join("");
+                          const more = imgs.length > 3
+                            ? `<span style="width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.58);border:2px solid rgba(255,255,255,.92);color:white;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;margin-left:-8px;box-shadow:0 2px 8px rgba(0,0,0,.45);">+${imgs.length - 3}</span>`
+                            : "";
+                          return `<div style="display:flex;align-items:center;justify-content:flex-end;padding-right:8px;">${html}${more}</div>`;
+                        ]]]
                     styles:
                       card:
                         - border-radius: 22px
@@ -57,6 +72,12 @@
                         - grid-template-areas: '"n" "s" "l"'
                         - grid-template-rows: 1fr min-content min-content
                         - height: 100%
+                      custom_fields:
+                        thumbs:
+                          - position: absolute
+                          - top: 10px
+                          - right: 10px
+                          - z-index: 2
                       name:
                         - align-self: end
                         - justify-self: start

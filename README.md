@@ -4,7 +4,7 @@
 
 # Boum Garden
 
-Aktuelle Version: 0.3.2 for Home Assistant
+Aktuelle Version: 0.3.5 for Home Assistant
 
 Custom Home Assistant integration for Boum Garden devices using the Boum IoT REST API directly.
 
@@ -96,9 +96,22 @@ Known Boum sizes from public product information:
 - Boum Pro pot: 30 L
 - Core/Pro pot internal reservoir: 2 L
 
-For the 35 L tank, the integration uses Boum's frontend formula from `waterTableRange` and does not need manual empty/full calibration. For the 55 L or custom tank, configure empty/full distances to calculate a generic percentage and, when a volume is known, litres, until Boum exposes the 55 L formula or tank metadata through the API. The 2 L reservoir belongs to each individual pot and is not the main water tank volume.
+For the 35 L tank, the integration uses Boum's frontend formula from `waterTableRange` and does not need manual empty/full calibration. For the 55 L tank, the integration uses a cylinder-based formula from the supplied dimensions: height 72 cm, diameter 40 cm, usable volume 55 L, plus the verified API/app calibration point of 44 L at `waterTableRange ≈ 15.2583 cm`. Custom tanks can use empty/full distance calibration. The 2 L reservoir belongs to each individual pot and is not the main water tank volume.
 
-Formula:
+35 L formula:
+
+```text
+L = ((40 - d) * 3.14 / (3 * 1000)) * ((19 - d/10)^2 + (19 - d/10) * 14.5 + 14.5^2)
+```
+
+55 L formula:
+
+```text
+L = (sensor_to_bottom_cm - d) * 3.14 * 20^2 / 1000
+sensor_to_bottom_cm is calibrated from: waterTableRange 15.2583 cm = 44 L
+```
+
+Custom tank formula:
 
 ```text
 level_percent = (empty_distance_cm - current_distance_cm) / (empty_distance_cm - full_distance_cm) * 100
@@ -263,12 +276,14 @@ Note: Boum currently exposes pump/refill information at device level in the avai
 
 
 
-### 0.3.2
+### 0.3.5
 
-- Corrected tank presets to the currently relevant Boum tank sizes: 35 L and 55 L.
-- The 35 L tank uses the Boum-provided frontend formula from `waterTableRange`.
-- The 55 L tank uses generic empty/full distance calibration until Boum provides the 55 L formula or tank metadata via API.
-- README now documents optional dashboard plugins required by the included Lovelace examples.
+- Added the 55 L tank geometry formula using supplied tank dimensions: height 72 cm, diameter 40 cm, usable volume 55 L.
+- Calibrated the 55 L formula with the verified app/API point: `waterTableRange ≈ 15.2583 cm = 44 L`.
+- Kept the 35 L tank on Boum's supplied frontend frustum formula.
+- Tank presets are now: `tank_35l`, `tank_55l`, and `custom`.
+- Dashboard plant cards now show multiple plant images as small overlay thumbnails when a pot contains more than one plant.
+- README documents required dashboard plugins.
 
 ### 0.3.1
 
