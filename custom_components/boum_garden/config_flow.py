@@ -10,7 +10,14 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig, SelectSelectorMode
+from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .api import BoumApiClient, BoumApiError, BoumAuthError
 from .const import (
@@ -167,7 +174,9 @@ def _user_schema(user_input: dict[str, Any] | None = None) -> vol.Schema:
     return vol.Schema(
         {
             vol.Required(CONF_EMAIL, default=defaults.get(CONF_EMAIL, "")): str,
-            vol.Required(CONF_PASSWORD): str,
+            vol.Required(CONF_PASSWORD): TextSelector(
+                TextSelectorConfig(type=TextSelectorType.PASSWORD)
+            ),
             vol.Required(CONF_ENV, default=defaults.get(CONF_ENV, DEFAULT_ENV)): SelectSelector(
                 SelectSelectorConfig(
                     options=list(ENV_BASE_URLS.keys()),

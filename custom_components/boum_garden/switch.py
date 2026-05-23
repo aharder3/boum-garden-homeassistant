@@ -35,6 +35,7 @@ class BoumPumpSwitch(CoordinatorEntity[BoumGardenDataUpdateCoordinator], SwitchE
 
     _attr_has_entity_name = True
     _attr_translation_key = "pump"
+    _attr_icon = "mdi:water-pump"
 
     def __init__(
         self,

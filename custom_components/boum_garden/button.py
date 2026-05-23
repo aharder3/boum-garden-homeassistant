@@ -31,6 +31,7 @@ async def async_setup_entry(
         entities.append(BoumRefreshButton(coordinator, device_id))
         entities.append(BoumRestartButton(coordinator, api, device_id))
         entities.append(BoumResetLastPumpedButton(coordinator, api, device_id))
+        entities.append(BoumResetWifiCredentialsButton(coordinator, api, device_id))
     async_add_entities(entities)
 
 
@@ -115,4 +116,28 @@ class BoumResetLastPumpedButton(BoumBaseButton):
     async def async_press(self) -> None:
         """Reset last pumped value on the device."""
         await self._api.send_device_command(self._device_id, "resetLastPumped")
+        await self.coordinator.async_request_refresh()
+
+
+
+class BoumResetWifiCredentialsButton(BoumBaseButton):
+    """Reset Wi-Fi credentials button. The entity is disabled by default because it is disruptive."""
+
+    _attr_translation_key = "reset_wifi_credentials"
+    _attr_icon = "mdi:wifi-remove"
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(
+        self,
+        coordinator: BoumGardenDataUpdateCoordinator,
+        api: BoumApiClient,
+        device_id: str,
+    ) -> None:
+        super().__init__(coordinator, device_id)
+        self._api = api
+        self._attr_unique_id = f"{DOMAIN}_{device_id}_reset_wifi_credentials"
+
+    async def async_press(self) -> None:
+        """Reset Wi-Fi credentials on the device."""
+        await self._api.send_device_command(self._device_id, "resetWiFiCredentials")
         await self.coordinator.async_request_refresh()

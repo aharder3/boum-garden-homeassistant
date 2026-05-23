@@ -2,12 +2,14 @@
   "domain": "boum_garden",
   "name": "Boum Garden",
   "after_dependencies": [],
-  "codeowners": ["@arthurharder"],
+  "codeowners": [
+    "@arthurharder"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/boum-garden/cli",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/boum-garden/cli/issues",
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.1.2"
 }

@@ -3,13 +3,13 @@
     "step": {
       "user": {
         "title": "Boum Garden",
-        "description": "Connect Home Assistant to the Boum IoT REST API.",
+        "description": "Connects Home Assistant directly to the Boum IoT REST API. Note: “local” is a local development/proxy endpoint according to the Boum CLI docs, not automatically the plant device IP.",
         "data": {
           "email": "Email",
           "password": "Password",
           "env": "API environment",
           "scan_interval": "Scan interval in seconds",
-          "base_url_override": "Custom API base URL (optional)"
+          "base_url_override": "Custom API base URL (optional, e.g. local proxy; not a device IP)"
         }
       },
       "reauth_confirm": {
@@ -42,25 +42,106 @@
   },
   "entity": {
     "sensor": {
-      "device_status": {"name": "Status"},
-      "battery": {"name": "Battery"},
-      "temperature": {"name": "Temperature"},
-      "humidity": {"name": "Humidity"},
-      "moisture": {"name": "Moisture"},
-      "water_level": {"name": "Water level"},
-      "flow_rate": {"name": "Flow rate"},
-      "rssi": {"name": "RSSI"},
-      "last_seen": {"name": "Last seen"},
-      "last_pumped": {"name": "Last pumped"},
-      "pump_state": {"name": "Pump state"}
+      "device_status": {
+        "name": "Status"
+      },
+      "battery": {
+        "name": "Battery"
+      },
+      "temperature": {
+        "name": "Temperature"
+      },
+      "humidity": {
+        "name": "Humidity"
+      },
+      "moisture": {
+        "name": "Moisture"
+      },
+      "water_level": {
+        "name": "Water level"
+      },
+      "flow_rate": {
+        "name": "Flow rate"
+      },
+      "rssi": {
+        "name": "RSSI"
+      },
+      "last_seen": {
+        "name": "Last seen"
+      },
+      "last_pumped": {
+        "name": "Last pumped"
+      },
+      "pump_state": {
+        "name": "Pump state"
+      },
+      "online": {
+        "name": "Online"
+      },
+      "connection_state": {
+        "name": "Connection state"
+      },
+      "firmware": {
+        "name": "Firmware"
+      },
+      "model": {
+        "name": "Model"
+      },
+      "leakage_detection": {
+        "name": "Leakage detection"
+      },
+      "min_flow_rate": {
+        "name": "Minimum flow rate"
+      },
+      "max_pump_duration": {
+        "name": "Maximum pump duration"
+      },
+      "refill_interval": {
+        "name": "Refill interval"
+      },
+      "max_pub_interval": {
+        "name": "Measurement interval on low battery"
+      },
+      "high_battery_max_pub_interval": {
+        "name": "Measurement interval on high battery"
+      },
+      "daily_refill_1": {
+        "name": "Daily refill 1"
+      },
+      "refill_time_1": {
+        "name": "Refill time 1"
+      },
+      "daily_refill_2": {
+        "name": "Daily refill 2"
+      },
+      "refill_time_2": {
+        "name": "Refill time 2"
+      },
+      "daily_refill_3": {
+        "name": "Daily refill 3"
+      },
+      "refill_time_3": {
+        "name": "Refill time 3"
+      }
     },
     "switch": {
-      "pump": {"name": "Pump"}
+      "pump": {
+        "name": "Pump"
+      }
     },
     "button": {
-      "refresh": {"name": "Refresh"},
-      "restart_device": {"name": "Restart device"},
-      "reset_last_pumped": {"name": "Reset last pumped"}
+      "refresh": {
+        "name": "Refresh"
+      },
+      "restart_device": {
+        "name": "Restart device"
+      },
+      "reset_last_pumped": {
+        "name": "Reset last pumped"
+      },
+      "reset_wifi_credentials": {
+        "name": "Reset Wi-Fi credentials"
+      }
     }
   }
 }

@@ -25,5 +25,7 @@ async def async_get_config_entry_diagnostics(
     return {
         "entry": async_redact_data(dict(entry.data), TO_REDACT),
         "options": dict(entry.options),
+        "user": async_redact_data(getattr(coordinator, "user", {}), TO_REDACT),
+        "api_errors": async_redact_data(getattr(coordinator, "last_api_errors", {}), TO_REDACT),
         "devices": async_redact_data(coordinator.data or {}, TO_REDACT),
     }

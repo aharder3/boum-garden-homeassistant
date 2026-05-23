@@ -10,30 +10,68 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from .const import DOMAIN, MANUFACTURER
 
 
+DEVICE_ID_KEYS = (
+    "id",
+    "deviceId",
+    "device_id",
+    "serialNumber",
+    "serial_number",
+    "serial",
+    "serialNo",
+    "thingName",
+    "thing_name",
+    "uuid",
+    "mac",
+    "macAddress",
+    "hardwareId",
+)
+
+DEVICE_NAME_KEYS = (
+    "name",
+    "deviceName",
+    "device_name",
+    "displayName",
+    "display_name",
+    "friendlyName",
+    "friendly_name",
+    "label",
+    "nickname",
+    "alias",
+)
+
+INVALID_NAMES = {"unknown", "nknown", "none", "null", "undefined", ""}
+
+
 def device_id_from_device(device: Mapping[str, Any]) -> str:
     """Return a stable ID for a device."""
-    for key in ("id", "deviceId", "device_id", "serialNumber", "serial_number", "uuid"):
-        value = device.get(key)
+    for source in (device, reported_state(device), desired_state(device), telemetry_state(device)):
+        value = _first_present(source, keys=DEVICE_ID_KEYS)
         if value not in (None, ""):
             return str(value)
-    reported = reported_state(device)
-    for key in ("id", "deviceId", "serialNumber"):
-        value = reported.get(key)
-        if value not in (None, ""):
-            return str(value)
-    return "unknown"
+
+    nested_value = _find_first_key_recursive(device, DEVICE_ID_KEYS)
+    if nested_value not in (None, ""):
+        return str(nested_value)
+
+    return "boum_garden"
 
 
 def device_name(device: Mapping[str, Any]) -> str:
     """Return a friendly device name."""
-    reported = reported_state(device)
-    desired = desired_state(device)
-    for source in (device, reported, desired):
-        for key in ("name", "deviceName", "device_name", "label", "nickname"):
-            value = source.get(key) if isinstance(source, Mapping) else None
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-    return f"Boum {device_id_from_device(device)[-6:]}"
+    for source in (device, reported_state(device), desired_state(device), telemetry_state(device)):
+        value = _first_present(source, keys=DEVICE_NAME_KEYS)
+        if _valid_name(value):
+            return str(value).strip()
+
+    nested_value = _find_first_key_recursive(device, DEVICE_NAME_KEYS)
+    if _valid_name(nested_value):
+        return str(nested_value).strip()
+
+    device_id = device_id_from_device(device)
+    if device_id and device_id != "boum_garden":
+        suffix = device_id[-6:] if len(device_id) > 6 else device_id
+        return f"Boum Garden {suffix}"
+    return "Boum Garden"
 
 
 def reported_state(device: Mapping[str, Any]) -> dict[str, Any]:
@@ -62,13 +100,33 @@ def desired_state(device: Mapping[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def telemetry_state(device: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the latest telemetry values fetched from the data endpoint."""
+    telemetry = device.get("_latest_telemetry")
+    if isinstance(telemetry, Mapping):
+        return dict(telemetry)
+    return {}
+
+
 def device_info(device: Mapping[str, Any]) -> DeviceInfo:
     """Return Home Assistant device registry info."""
     device_id = device_id_from_device(device)
     reported = reported_state(device)
-    model = _first_present(device, reported, keys=("model", "deviceModel", "hardware", "type"))
+    desired = desired_state(device)
+    telemetry = telemetry_state(device)
+    model = _first_present(
+        device,
+        reported,
+        desired,
+        telemetry,
+        keys=("model", "deviceModel", "hardware", "hardwareVersion", "type", "productName"),
+    )
     sw_version = _first_present(
-        device, reported, keys=("swVersion", "firmware", "firmwareVersion", "version")
+        device,
+        reported,
+        desired,
+        telemetry,
+        keys=("swVersion", "firmware", "firmwareVersion", "appVersion", "version"),
     )
     return DeviceInfo(
         identifiers={(DOMAIN, device_id)},
@@ -80,7 +138,7 @@ def device_info(device: Mapping[str, Any]) -> DeviceInfo:
 
 
 def find_value(data: Mapping[str, Any], keys: tuple[str, ...]) -> Any:
-    """Find a value by exact or case-insensitive key in a nested mapping."""
+    """Find a value by exact or case-insensitive key in nested mappings/lists."""
     for key in keys:
         if key in data:
             return data[key]
@@ -88,13 +146,14 @@ def find_value(data: Mapping[str, Any], keys: tuple[str, ...]) -> Any:
     stack: list[Any] = [data]
     while stack:
         current = stack.pop()
-        if not isinstance(current, Mapping):
-            continue
-        for key, value in current.items():
-            if str(key).lower() in wanted:
-                return value
-            if isinstance(value, Mapping):
-                stack.append(value)
+        if isinstance(current, Mapping):
+            for key, value in current.items():
+                if str(key).lower() in wanted:
+                    return value
+                if isinstance(value, (Mapping, list)):
+                    stack.append(value)
+        elif isinstance(current, list):
+            stack.extend(item for item in current if isinstance(item, (Mapping, list)))
     return None
 
 
@@ -108,6 +167,10 @@ def as_float(value: Any) -> float | None:
         return float(value)
     if isinstance(value, str):
         cleaned = value.strip().replace("%", "")
+        for suffix in ("min", "days", "day", "s", "sec", "seconds"):
+            if cleaned.endswith(suffix):
+                cleaned = cleaned[: -len(suffix)].strip()
+                break
         try:
             return float(cleaned)
         except ValueError:
@@ -157,3 +220,27 @@ def _first_present(*sources: Mapping[str, Any], keys: tuple[str, ...]) -> Any:
             if value not in (None, ""):
                 return value
     return None
+
+
+def _find_first_key_recursive(data: Any, keys: tuple[str, ...]) -> Any:
+    """Find the first non-empty key recursively, case-insensitively."""
+    wanted = {key.lower() for key in keys}
+    stack: list[Any] = [data]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, Mapping):
+            for key, value in current.items():
+                if str(key).lower() in wanted and value not in (None, ""):
+                    return value
+                if isinstance(value, (Mapping, list)):
+                    stack.append(value)
+        elif isinstance(current, list):
+            stack.extend(item for item in current if isinstance(item, (Mapping, list)))
+    return None
+
+
+def _valid_name(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    return text.lower() not in INVALID_NAMES

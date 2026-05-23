@@ -100,6 +100,10 @@ class BoumApiClient:
         """Return the full shadow for a device."""
         return await self._request("GET", f"/devices/{device_id}")
 
+    async def get_device_owner(self, device_id: str) -> dict[str, Any]:
+        """Return owner information for a device."""
+        return await self._request("GET", f"/devices/{device_id}/owner")
+
     async def update_device_desired_state(
         self, device_id: str, desired_state: Mapping[str, Any]
     ) -> dict[str, Any]:
@@ -196,7 +200,28 @@ class BoumApiClient:
             await self._token_update_callback(self.access_token, self.refresh_token)
 
 
-def _first_str(data: Mapping[str, Any] | Any, *keys: str) -> str | None:
+async def _read_json_or_text(response: aiohttp.ClientResponse) -> Any:
+    """Read a response as JSON when possible, otherwise text."""
+    try:
+        return await response.json(content_type=None)
+    except Exception:  # noqa: BLE001 - fallback for non-json error bodies
+        return await response.text()
+
+
+def _error_message(body: Any, fallback: str) -> str:
+    """Extract an API error message."""
+    if isinstance(body, Mapping):
+        for key in ("message", "error", "detail", "title"):
+            value = body.get(key)
+            if value:
+                return str(value)
+    if isinstance(body, str) and body.strip():
+        return body.strip()
+    return fallback
+
+
+def _first_str(data: Any, *keys: str) -> str | None:
+    """Return the first non-empty string from a mapping."""
     if not isinstance(data, Mapping):
         return None
     for key in keys:
@@ -206,40 +231,14 @@ def _first_str(data: Mapping[str, Any] | Any, *keys: str) -> str | None:
     return None
 
 
-async def _read_json_or_text(response: aiohttp.ClientResponse) -> Any:
-    try:
-        return await response.json(content_type=None)
-    except Exception:  # noqa: BLE001 - API can return non-JSON on failures
-        return await response.text()
-
-
-def _error_message(body: Any, fallback: str) -> str:
-    if isinstance(body, Mapping):
-        message = body.get("message") or body.get("error") or body.get("detail")
-        if isinstance(message, str):
-            return message
-    if isinstance(body, str) and body.strip():
-        return body.strip()
-    return fallback
-
-
 def _coerce_devices(data: Any) -> list[dict[str, Any]]:
-    """Coerce common API list shapes into a list of device dictionaries."""
+    """Coerce common device list response shapes into a list of dictionaries."""
     if isinstance(data, list):
-        return [item for item in data if isinstance(item, dict)]
+        return [dict(item) for item in data if isinstance(item, Mapping)]
     if isinstance(data, Mapping):
-        for key in ("devices", "items", "results", "claimed"):
+        for key in ("devices", "items", "results", "claimedDevices", "claimed_devices"):
             value = data.get(key)
             if isinstance(value, list):
-                return [item for item in value if isinstance(item, dict)]
-        if _device_id(data):
-            return [dict(data)]
+                return [dict(item) for item in value if isinstance(item, Mapping)]
+        return [dict(data)]
     return []
-
-
-def _device_id(device: Mapping[str, Any]) -> str | None:
-    for key in ("id", "deviceId", "device_id", "serialNumber", "serial_number", "uuid"):
-        value = device.get(key)
-        if value is not None:
-            return str(value)
-    return None
