@@ -1319,16 +1319,22 @@ def _find_known_value(
 
 def _dynamic_scalar_paths(device: Mapping[str, Any]) -> list[tuple[str, str]]:
     paths: list[tuple[str, str]] = []
+    # Only expose compact dynamic sensors from the current/latest API sections.
+    # Do not create separate entities for last-hour / last-7-days telemetry,
+    # because that creates noisy duplicates such as
+    # "Telemetry Last Hour Battery Voltage Timestamp". Historical telemetry
+    # remains available in diagnostics and compact attributes.
     for source, data in (
         ("reported", reported_state(device)),
         ("desired", desired_state(device)),
         ("telemetry", telemetry_state(device)),
-        ("telemetry_last_hour", device.get("_latest_telemetry_last_hour", {})),
-        ("telemetry_last_7d", device.get("_latest_telemetry_last_7d", {})),
     ):
         for path, value in _flatten_scalars(data):
+            normalised_path = _normalise_key(path)
             normalised_last_key = _normalise_key(path.split(".")[-1])
             if normalised_last_key in KNOWN_SENSOR_KEYS or normalised_last_key in DYNAMIC_SKIP_KEYS:
+                continue
+            if _path_is_low_value_dynamic(normalised_path):
                 continue
             if _path_is_sensitive(path) or not _value_is_reasonable_dynamic(value):
                 continue
@@ -1953,6 +1959,40 @@ def _friendly_name(source: str, path: str) -> str:
 def _metadata_for_path(path: str) -> dict[str, Any]:
     lowered = path.lower()
     metadata: dict[str, Any] = {"icon": "mdi:information-outline"}
+
+    # Electrical telemetry should not be treated as battery percentage just
+    # because the path contains the word "battery".
+    if "voltage" in lowered:
+        metadata.update(
+            {
+                "icon": "mdi:flash-triangle",
+                "unit": "V",
+                "state_class": SensorStateClass.MEASUREMENT,
+                "value_type": "float",
+            }
+        )
+        return {key: value for key, value in metadata.items() if value is not None}
+    if "current" in lowered:
+        metadata.update(
+            {
+                "icon": "mdi:current-dc",
+                "unit": "mA",
+                "state_class": SensorStateClass.MEASUREMENT,
+                "value_type": "float",
+            }
+        )
+        return {key: value for key, value in metadata.items() if value is not None}
+    if "flow" in lowered or "durchfluss" in lowered:
+        metadata.update(
+            {
+                "icon": "mdi:waves-arrow-right",
+                "unit": "L/min",
+                "state_class": SensorStateClass.MEASUREMENT,
+                "value_type": "float",
+            }
+        )
+        return {key: value for key, value in metadata.items() if value is not None}
+
     if any(token in lowered for token in ("water", "tank", "reservoir")):
         metadata["icon"] = "mdi:cup-water"
     if "pump" in lowered:
@@ -2016,6 +2056,22 @@ def _metadata_for_path(path: str) -> dict[str, Any]:
 def _path_is_sensitive(path: str) -> bool:
     lowered = _normalise_key(path)
     return any(token in lowered for token in SENSITIVE_PATH_TOKENS)
+
+
+def _path_is_low_value_dynamic(normalised_path: str) -> bool:
+    """Return true for dynamic values that are too noisy for default entities."""
+    low_value_tokens = (
+        "timestamp",
+        "createdat",
+        "updatedat",
+        "time",
+        "date",
+        "last7d",
+        "lasthour",
+    )
+    # Keep curated timestamp sensors like last pumped / derived watering, but
+    # suppress automatically generated telemetry timestamp entities.
+    return any(token in normalised_path for token in low_value_tokens)
 
 
 def _value_is_reasonable_dynamic(value: Any) -> bool:

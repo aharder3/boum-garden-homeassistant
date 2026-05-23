@@ -252,7 +252,7 @@ Die dynamischen Karten nutzen `custom:auto-entities` und Mushroom Cards. Die Mar
 Note: Boum currently exposes pump/refill information at device level in the available API payload. Per-pot last watering is therefore best-effort and based on the device/global pump/refill timestamp unless Boum exposes per-container history in future.
 
 
-### 0.2.7
+### 0.2.8
 
 - Preserve Boum named telemetry series from `/devices/:id/data`.
 - Read `batteryCapacity` from named telemetry as battery percentage.

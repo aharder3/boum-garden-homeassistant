@@ -7,8 +7,8 @@
       - type: grid
         cards:
           - type: heading
-            icon: mdi:sprout
-            heading: Boum Garden
+            icon: mdi:view-dashboard-outline
+            heading: Übersicht
 
           - type: custom:auto-entities
             card:
@@ -18,137 +18,66 @@
             card_param: cards
             filter:
               include:
-                - integration: boum_garden
-                  entity_id: sensor.*pflanztopf*tabelle*
+                - entity_id: sensor.garten_batterie
                   options:
                     type: tile
-                    name: Pflanztopf Tabelle
-                    icon: mdi:table
-
-                - integration: boum_garden
-                  entity_id: sensor.*pflanzen*
+                    name: Batterie
+                    icon: mdi:battery
+                    color: green
+                - entity_id: sensor.garten_temperatur
                   options:
                     type: tile
-                    name: Pflanzen
-                    icon: mdi:sprout
-
-                - integration: boum_garden
-                  entity_id: sensor.*nachste*bewaesserung*
+                    name: Temperatur
+                    icon: mdi:thermometer
+                    color: orange
+                - entity_id: sensor.garten_wasserfullstand
                   options:
                     type: tile
-                    name: Nächste Bewässerung
-                    icon: mdi:calendar-clock
-
-                - integration: boum_garden
-                  entity_id: sensor.*nächste*bewässerung*
+                    name: Wasserfüllstand
+                    icon: mdi:cup-water
+                    color: blue
+                - entity_id: sensor.garten_wasserfüllstand
                   options:
                     type: tile
-                    name: Nächste Bewässerung
-                    icon: mdi:calendar-clock
-
-                - integration: boum_garden
-                  entity_id: switch.*pumpe*
+                    name: Wasserfüllstand
+                    icon: mdi:cup-water
+                    color: blue
+                - entity_id: sensor.garten_wasserabstand
+                  options:
+                    type: tile
+                    name: Wasserabstand
+                    icon: mdi:arrow-expand-vertical
+                    color: cyan
+                - entity_id: sensor.garten_rssi
+                  options:
+                    type: tile
+                    name: WLAN
+                    icon: mdi:wifi
+                    color: cyan
+                - entity_id: sensor.garten_durchfluss
+                  options:
+                    type: tile
+                    name: Durchfluss
+                    icon: mdi:waves-arrow-right
+                    color: blue
+                - entity_id: switch.garten_pumpe
                   options:
                     type: tile
                     name: Pumpe
                     icon: mdi:water-pump
+                    color: blue
                     tap_action:
                       action: toggle
-
-                - integration: boum_garden
-                  entity_id: sensor.*pumpenstatus*
-                  options:
-                    type: tile
-                    icon: mdi:pump
-
-                - integration: boum_garden
-                  entity_id: sensor.*zuletzt*getrankt*
-                  options:
-                    type: tile
-                    icon: mdi:watering-can
-
-                - integration: boum_garden
-                  entity_id: sensor.*zuletzt*getränkt*
-                  options:
-                    type: tile
-                    icon: mdi:watering-can
-
               exclude:
-                - entity_id: sensor.*pflanzcontainer*
-                - entity_id: "*aqua*"
-                - entity_id: "*ultra*"
-                - entity_id: "*dreame*"
-                - entity_id: "*sweepy*"
-                - entity_id: "*vacuum*"
-                - entity_id: "*api_user*"
-                - entity_id: "*owner*"
-                - entity_id: "*token*"
-                - entity_id: "*preview*"
-                - entity_id: "*truncated*"
-            sort:
-              method: name
-
-      - type: grid
-        cards:
-          - type: heading
-            icon: mdi:flower-tulip
-            heading: Pflanztöpfe
-
-          - type: custom:auto-entities
-            card:
-              type: grid
-              columns: 2
-              square: false
-            card_param: cards
-            filter:
-              include:
-                - integration: boum_garden
-                  entity_id: sensor.*pflanzcontainer*
-                  options:
-                    type: tile
-                    icon: mdi:flower-tulip
-              exclude:
-                - entity_id: sensor.*zuletzt*bewaessert*
-                - entity_id: sensor.*zuletzt*bewässert*
-                - entity_id: sensor.*pflanztopf*tabelle*
-                - entity_id: "*api_user*"
-                - entity_id: "*owner*"
-                - entity_id: "*token*"
-                - entity_id: "*preview*"
-                - entity_id: "*truncated*"
-            sort:
-              method: name
-
-      - type: grid
-        cards:
-          - type: heading
-            icon: mdi:watering-can
-            heading: Zuletzt Wasser
-
-          - type: custom:auto-entities
-            card:
-              type: grid
-              columns: 2
-              square: false
-            card_param: cards
-            filter:
-              include:
-                - integration: boum_garden
-                  entity_id: sensor.*pflanzcontainer*zuletzt*bewaessert*
-                  options:
-                    type: tile
-                    icon: mdi:watering-can
-                - integration: boum_garden
-                  entity_id: sensor.*pflanzcontainer*zuletzt*bewässert*
-                  options:
-                    type: tile
-                    icon: mdi:watering-can
-              exclude:
-                - entity_id: "*api_user*"
-                - entity_id: "*owner*"
-                - entity_id: "*token*"
-                - entity_id: "*preview*"
-                - entity_id: "*truncated*"
+                - entity_id: '*timestamp*'
+                - entity_id: '*telemetry*'
+                - entity_id: '*aqua*'
+                - entity_id: '*dreame*'
+                - entity_id: '*sweepy*'
+                - entity_id: '*api_user*'
+                - entity_id: '*owner*'
+                - entity_id: '*token*'
+                - entity_id: '*truncated*'
             sort:
               method: name
 
@@ -166,109 +95,72 @@
             card_param: cards
             filter:
               include:
-                - integration: boum_garden
-                  entity_id: switch.*pumpe*
+                - entity_id: sensor.garten_nachste_bewaesserung
                   options:
                     type: tile
-                    name: Pumpe
-                    icon: mdi:water-pump
-                    tap_action:
-                      action: toggle
-
-                - integration: boum_garden
-                  entity_id: sensor.*pumpe*
+                    name: Nächste Bewässerung
+                    icon: mdi:calendar-clock
+                    color: blue
+                - entity_id: sensor.garten_nächste_bewässerung
                   options:
                     type: tile
+                    name: Nächste Bewässerung
+                    icon: mdi:calendar-clock
+                    color: blue
+                - entity_id: sensor.garten_nachfullzeit
+                  options:
+                    type: tile
+                    name: Nachfüllzeit
+                    icon: mdi:clock-outline
+                    color: cyan
+                - entity_id: sensor.garten_nachfüllzeit
+                  options:
+                    type: tile
+                    name: Nachfüllzeit
+                    icon: mdi:clock-outline
+                    color: cyan
+                - entity_id: sensor.garten_nachfullintervall
+                  options:
+                    type: tile
+                    name: Nachfüllintervall
+                    icon: mdi:calendar-refresh
+                    color: cyan
+                - entity_id: sensor.garten_nachfüllintervall
+                  options:
+                    type: tile
+                    name: Nachfüllintervall
+                    icon: mdi:calendar-refresh
+                    color: cyan
+                - entity_id: sensor.garten_pumpenstatus
+                  options:
+                    type: tile
+                    name: Pumpenstatus
                     icon: mdi:pump
-
-                - integration: boum_garden
-                  entity_id: sensor.*pump*
+                    color: blue
+                - entity_id: sensor.garten_pumpen_abgleich
                   options:
                     type: tile
-                    icon: mdi:pump
-
-                - integration: boum_garden
-                  entity_id: sensor.*pumpenstatus*
-                  options:
-                    type: tile
-                    icon: mdi:pump
-
-                - integration: boum_garden
-                  entity_id: sensor.*abgleich*
-                  options:
-                    type: tile
+                    name: Pumpen-Abgleich
                     icon: mdi:sync
-
-                - integration: boum_garden
-                  entity_id: sensor.*nachfull*
+                    color: blue
+                - entity_id: sensor.garten_leckage_erkennung
                   options:
                     type: tile
-                    icon: mdi:clock-outline
-
-                - integration: boum_garden
-                  entity_id: sensor.*nachfüll*
-                  options:
-                    type: tile
-                    icon: mdi:clock-outline
-
-                - integration: boum_garden
-                  entity_id: sensor.*refill*
-                  options:
-                    type: tile
-                    icon: mdi:clock-outline
-
-                - integration: boum_garden
-                  entity_id: sensor.*durchfluss*
-                  options:
-                    type: tile
-                    icon: mdi:waves-arrow-right
-
-                - integration: boum_garden
-                  entity_id: sensor.*flow*
-                  options:
-                    type: tile
-                    icon: mdi:waves-arrow-right
-
-                - integration: boum_garden
-                  entity_id: sensor.*zuletzt*gepumpt*
-                  options:
-                    type: tile
-                    icon: mdi:watering-can-outline
-
-                - integration: boum_garden
-                  entity_id: sensor.*zuletzt*getrankt*
-                  options:
-                    type: tile
-                    icon: mdi:watering-can
-
-                - integration: boum_garden
-                  entity_id: sensor.*zuletzt*getränkt*
-                  options:
-                    type: tile
-                    icon: mdi:watering-can
+                    name: Leckage
+                    icon: mdi:pipe-leak
+                    color: red
               exclude:
-                - entity_id: sensor.*pflanzcontainer*
-                - entity_id: sensor.*pflanzen*
-                - entity_id: sensor.*pflanztopf*tabelle*
-                - entity_id: "*aqua*"
-                - entity_id: "*ultra*"
-                - entity_id: "*dreame*"
-                - entity_id: "*sweepy*"
-                - entity_id: "*vacuum*"
-                - entity_id: "*mop*"
-                - entity_id: "*api_user*"
-                - entity_id: "*owner*"
-                - entity_id: "*token*"
-                - entity_id: "*preview*"
-                - entity_id: "*truncated*"
+                - entity_id: '*telemetry*'
+                - entity_id: '*timestamp*'
+                - entity_id: '*pflanzcontainer*'
             sort:
               method: name
 
       - type: grid
         cards:
           - type: heading
-            icon: mdi:chart-box-outline
-            heading: Werte
+            icon: mdi:flower-tulip
+            heading: Pflanztöpfe
 
           - type: custom:auto-entities
             card:
@@ -278,38 +170,80 @@
             card_param: cards
             filter:
               include:
-                - integration: boum_garden
-                  domain: sensor
+                - entity_id: sensor.garten_pflanzcontainer_*
                   options:
                     type: tile
+                    icon: mdi:flower-tulip
+                    color: green
               exclude:
-                - entity_id: sensor.*pflanzcontainer*
-                - entity_id: sensor.*pflanztopf*tabelle*
-                - entity_id: sensor.*pflanzen*
-                - entity_id: sensor.*pumpe*
-                - entity_id: sensor.*pump*
-                - entity_id: sensor.*pumpenstatus*
-                - entity_id: sensor.*abgleich*
-                - entity_id: sensor.*nachfull*
-                - entity_id: sensor.*nachfüll*
-                - entity_id: sensor.*refill*
-                - entity_id: sensor.*durchfluss*
-                - entity_id: sensor.*flow*
-                - entity_id: sensor.*zuletzt*gepumpt*
-                - entity_id: sensor.*zuletzt*getrankt*
-                - entity_id: sensor.*zuletzt*getränkt*
-                - entity_id: sensor.*telemetry*x*
-                - entity_id: sensor.*telemetry*y*
-                - entity_id: "*aqua*"
-                - entity_id: "*ultra*"
-                - entity_id: "*dreame*"
-                - entity_id: "*sweepy*"
-                - entity_id: "*vacuum*"
-                - entity_id: "*api_user*"
-                - entity_id: "*owner*"
-                - entity_id: "*token*"
-                - entity_id: "*preview*"
-                - entity_id: "*truncated*"
+                - entity_id: '*zuletzt*bewassert*'
+                - entity_id: '*zuletzt*bewaessert*'
+                - entity_id: '*zuletzt*bewässert*'
+                - entity_id: '*timestamp*'
+            sort:
+              method: name
+
+      - type: grid
+        cards:
+          - type: heading
+            icon: mdi:watering-can-outline
+            heading: Zuletzt bewässert
+
+          - type: custom:auto-entities
+            card:
+              type: grid
+              columns: 2
+              square: false
+            card_param: cards
+            filter:
+              include:
+                - entity_id: sensor.garten_pflanzcontainer_*_zuletzt_bewassert
+                  options:
+                    type: tile
+                    icon: mdi:watering-can
+                    color: blue
+                - entity_id: sensor.garten_pflanzcontainer_*_zuletzt_bewaessert
+                  options:
+                    type: tile
+                    icon: mdi:watering-can
+                    color: blue
+                - entity_id: sensor.garten_pflanzcontainer_*_zuletzt_bewässert
+                  options:
+                    type: tile
+                    icon: mdi:watering-can
+                    color: blue
+            sort:
+              method: name
+
+      - type: grid
+        cards:
+          - type: heading
+            icon: mdi:chart-box-outline
+            heading: Weitere Gerätewerte
+
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Details
+              show_header_toggle: false
+            filter:
+              include:
+                - entity_id: sensor.garten_firmware
+                - entity_id: sensor.garten_status
+                - entity_id: sensor.garten_maximale_pumpdauer
+                - entity_id: sensor.garten_zuletzt_gesehen
+                - entity_id: sensor.garten_battery_voltage*
+                - entity_id: sensor.garten_solar_voltage*
+                - entity_id: sensor.garten_input_current*
+                - entity_id: sensor.garten_temperature_esp*
+              exclude:
+                - entity_id: '*timestamp*'
+                - entity_id: '*telemetry*timestamp*'
+                - entity_id: '*last_hour*'
+                - entity_id: '*last_7d*'
+                - entity_id: '*api_user*'
+                - entity_id: '*owner*'
+                - entity_id: '*token*'
             sort:
               method: name
 
@@ -327,20 +261,20 @@
             card_param: cards
             filter:
               include:
-                - integration: boum_garden
-                  domain: button
+                - entity_id: button.garten_*
                   options:
                     type: tile
+                    color: blue
+                - entity_id: button.*boum*
+                  options:
+                    type: tile
+                    color: blue
               exclude:
-                - entity_id: "*aqua*"
-                - entity_id: "*ultra*"
-                - entity_id: "*dreame*"
-                - entity_id: "*sweepy*"
-                - entity_id: "*vacuum*"
-                - entity_id: "*api_user*"
-                - entity_id: "*owner*"
-                - entity_id: "*token*"
-                - entity_id: "*preview*"
-                - entity_id: "*truncated*"
+                - entity_id: '*aqua*'
+                - entity_id: '*dreame*'
+                - entity_id: '*sweepy*'
+                - entity_id: '*api_user*'
+                - entity_id: '*owner*'
+                - entity_id: '*token*'
             sort:
               method: name
