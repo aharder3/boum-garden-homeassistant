@@ -44,6 +44,21 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+def _tank_options_from_mapping(values: dict[str, Any]) -> dict[str, Any]:
+    """Extract tank options from config/options form values."""
+    tank_preset = values.get(CONF_TANK_PRESET, DEFAULT_TANK_PRESET) or DEFAULT_TANK_PRESET
+    out: dict[str, Any] = {CONF_TANK_PRESET: tank_preset}
+
+    # Keep empty values out of options to avoid ugly empty strings in storage.
+    for key in (CONF_TANK_VOLUME_LITERS, CONF_TANK_EMPTY_DISTANCE_CM, CONF_TANK_FULL_DISTANCE_CM):
+        value = values.get(key)
+        if value is None:
+            continue
+        value = str(value).strip()
+        if value:
+            out[key] = value
+    return out
+
 
 class BoumGardenConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a Boum Garden config flow."""
@@ -69,6 +84,7 @@ class BoumGardenConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             password = user_input[CONF_PASSWORD]
             scan_interval = int(user_input.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS))
             base_url_override = (user_input.get(CONF_BASE_URL_OVERRIDE) or "").strip() or None
+            tank_options = _tank_options_from_mapping(user_input)
 
             session = async_get_clientsession(self.hass)
             api = BoumApiClient(
@@ -100,7 +116,10 @@ class BoumGardenConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_SCAN_INTERVAL: scan_interval,
                         **({CONF_BASE_URL_OVERRIDE: base_url_override} if base_url_override else {}),
                     },
-                    options={CONF_SCAN_INTERVAL: scan_interval},
+                    options={
+                        CONF_SCAN_INTERVAL: scan_interval,
+                        **tank_options,
+                    },
                 )
 
         return self.async_show_form(
@@ -163,7 +182,13 @@ class BoumGardenOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         """Manage options."""
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            cleaned = dict(user_input)
+            cleaned.update(_tank_options_from_mapping(user_input))
+            # Remove optional empty custom values so defaults/presets remain clear.
+            for key in (CONF_TANK_VOLUME_LITERS, CONF_TANK_EMPTY_DISTANCE_CM, CONF_TANK_FULL_DISTANCE_CM):
+                if not str(cleaned.get(key, "")).strip():
+                    cleaned.pop(key, None)
+            return self.async_create_entry(title="", data=cleaned)
 
         current = int(
             self._config_entry.options.get(
@@ -197,7 +222,7 @@ class BoumGardenOptionsFlow(config_entries.OptionsFlow):
                     ): TextSelector(TextSelectorConfig(multiline=True)),
                     vol.Optional(
                         CONF_TANK_PRESET,
-                        default=options.get(CONF_TANK_PRESET, DEFAULT_TANK_PRESET),
+                        default=options.get(CONF_TANK_PRESET, self._config_entry.data.get(CONF_TANK_PRESET, DEFAULT_TANK_PRESET)),
                     ): SelectSelector(
                         SelectSelectorConfig(
                             options=list(TANK_PRESETS.keys()),
@@ -206,15 +231,15 @@ class BoumGardenOptionsFlow(config_entries.OptionsFlow):
                     ),
                     vol.Optional(
                         CONF_TANK_VOLUME_LITERS,
-                        default=str(options.get(CONF_TANK_VOLUME_LITERS, "")),
+                        default=str(options.get(CONF_TANK_VOLUME_LITERS, self._config_entry.data.get(CONF_TANK_VOLUME_LITERS, ""))),
                     ): str,
                     vol.Optional(
                         CONF_TANK_EMPTY_DISTANCE_CM,
-                        default=str(options.get(CONF_TANK_EMPTY_DISTANCE_CM, "")),
+                        default=str(options.get(CONF_TANK_EMPTY_DISTANCE_CM, self._config_entry.data.get(CONF_TANK_EMPTY_DISTANCE_CM, ""))),
                     ): str,
                     vol.Optional(
                         CONF_TANK_FULL_DISTANCE_CM,
-                        default=str(options.get(CONF_TANK_FULL_DISTANCE_CM, "")),
+                        default=str(options.get(CONF_TANK_FULL_DISTANCE_CM, self._config_entry.data.get(CONF_TANK_FULL_DISTANCE_CM, ""))),
                     ): str,
                 }
             ),
@@ -246,6 +271,27 @@ def _user_schema(user_input: dict[str, Any] | None = None) -> vol.Schema:
                 CONF_SCAN_INTERVAL,
                 default=defaults.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS),
             ): vol.All(vol.Coerce(int), vol.Range(min=60, max=86400)),
+            vol.Optional(
+                CONF_TANK_PRESET,
+                default=defaults.get(CONF_TANK_PRESET, DEFAULT_TANK_PRESET),
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=list(TANK_PRESETS.keys()),
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Optional(
+                CONF_TANK_VOLUME_LITERS,
+                default=defaults.get(CONF_TANK_VOLUME_LITERS, ""),
+            ): str,
+            vol.Optional(
+                CONF_TANK_EMPTY_DISTANCE_CM,
+                default=defaults.get(CONF_TANK_EMPTY_DISTANCE_CM, ""),
+            ): str,
+            vol.Optional(
+                CONF_TANK_FULL_DISTANCE_CM,
+                default=defaults.get(CONF_TANK_FULL_DISTANCE_CM, ""),
+            ): str,
             vol.Optional(
                 CONF_BASE_URL_OVERRIDE,
                 default=defaults.get(CONF_BASE_URL_OVERRIDE, ""),

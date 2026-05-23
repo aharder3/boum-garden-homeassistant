@@ -3,13 +3,17 @@
     "step": {
       "user": {
         "title": "Boum Garden",
-        "description": "Verbindet Home Assistant direkt mit der Boum IoT REST-API. Hinweis: „local“ ist gemäss Boum-CLI-Doku ein lokaler Entwicklungs-/Proxy-Endpunkt, nicht automatisch die IP des Pflanzgeräts.",
+        "description": "Verbindet Home Assistant direkt mit der Boum IoT REST-API. Wähle hier auch direkt deine Tankgrösse. Für Liter-Berechnung zusätzlich die Sensor-Abstände bei leerem und vollem Tank eintragen. Hinweis: „local“ ist gemäss Boum-CLI-Doku ein lokaler Entwicklungs-/Proxy-Endpunkt, nicht automatisch die IP des Pflanzgeräts.",
         "data": {
           "email": "E-Mail",
           "password": "Passwort",
           "env": "API-Umgebung",
           "scan_interval": "Abfrageintervall in Sekunden",
-          "base_url_override": "Eigene API-Basis-URL (optional, z. B. lokaler Proxy; keine Geräte-IP)"
+          "base_url_override": "Eigene API-Basis-URL (optional, z. B. lokaler Proxy; keine Geräte-IP)",
+          "tank_preset": "Tankgrösse",
+          "tank_volume_liters": "Tankvolumen in Liter (nur bei Benutzerdefiniert)",
+          "tank_empty_distance_cm": "Sensor-Abstand bei leerem Tank in cm",
+          "tank_full_distance_cm": "Sensor-Abstand bei vollem Tank in cm"
         }
       },
       "reauth_confirm": {
