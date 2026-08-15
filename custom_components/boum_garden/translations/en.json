@@ -1,0 +1,204 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Boum Garden",
+        "description": "Connects Home Assistant directly to the Boum IoT REST API. You can also select the tank size during setup. Supported presets are 32 L, 35 L, 55 L and custom tanks. Note: “local” is a local development/proxy endpoint according to the Boum CLI docs, not automatically the plant device IP.",
+        "data": {
+          "email": "Email",
+          "password": "Password",
+          "env": "API environment",
+          "scan_interval": "Scan interval in seconds",
+          "base_url_override": "Custom API base URL (optional, e.g. local proxy; not a device IP)",
+          "tank_preset": "Tank size",
+          "tank_volume_liters": "Tank volume in litres (custom only)",
+          "tank_empty_distance_cm": "Sensor distance when tank is empty in cm",
+          "tank_full_distance_cm": "Sensor distance when tank is full in cm"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Boum Garden",
+        "description": "Enter the password for {email}.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the Boum API.",
+      "invalid_auth": "Invalid Boum credentials.",
+      "unknown": "Unexpected error. Check the Home Assistant log."
+    },
+    "abort": {
+      "already_configured": "This Boum account is already configured.",
+      "reauth_successful": "Reauthentication was successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Boum Garden options",
+        "data": {
+          "scan_interval": "Scan interval in seconds",
+          "plant_name": "Local plant name (optional)",
+          "plant_location": "Local location / area (optional)",
+          "plant_icon": "Local icon, e.g. mdi:sprout",
+          "plants_json": "Multiple local plants as JSON (optional)",
+          "tank_preset": "Tank size",
+          "tank_volume_liters": "Tank volume in litres (custom only)",
+          "tank_empty_distance_cm": "Sensor distance when tank is empty in cm",
+          "tank_full_distance_cm": "Sensor distance when tank is full in cm"
+        },
+        "description": "Optional local plant data is only used when Boum does not expose plant names through the API. For water level: choose the tank size. 32 L and 35 L use the Boum frustum formula family from waterTableRange. 55 L uses the cylinder formula. Custom tanks need empty/full distance values."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "device_status": {
+        "name": "Status"
+      },
+      "battery": {
+        "name": "Battery"
+      },
+      "temperature": {
+        "name": "Temperature"
+      },
+      "humidity": {
+        "name": "Humidity"
+      },
+      "moisture": {
+        "name": "Moisture"
+      },
+      "water_level": {
+        "name": "Water level"
+      },
+      "flow_rate": {
+        "name": "Flow rate"
+      },
+      "rssi": {
+        "name": "RSSI"
+      },
+      "last_seen": {
+        "name": "Last seen"
+      },
+      "last_pumped": {
+        "name": "Last pumped"
+      },
+      "pump_state": {
+        "name": "Pump state"
+      },
+      "online": {
+        "name": "Online"
+      },
+      "connection_state": {
+        "name": "Connection state"
+      },
+      "firmware": {
+        "name": "Firmware"
+      },
+      "model": {
+        "name": "Model"
+      },
+      "leakage_detection": {
+        "name": "Leakage detection"
+      },
+      "min_flow_rate": {
+        "name": "Minimum flow rate"
+      },
+      "max_pump_duration": {
+        "name": "Maximum pump duration"
+      },
+      "refill_interval": {
+        "name": "Refill interval"
+      },
+      "max_pub_interval": {
+        "name": "Measurement interval on low battery"
+      },
+      "high_battery_max_pub_interval": {
+        "name": "Measurement interval on high battery"
+      },
+      "daily_refill_1": {
+        "name": "Daily refill 1"
+      },
+      "refill_time_1": {
+        "name": "Refill time 1"
+      },
+      "daily_refill_2": {
+        "name": "Daily refill 2"
+      },
+      "refill_time_2": {
+        "name": "Refill time 2"
+      },
+      "daily_refill_3": {
+        "name": "Daily refill 3"
+      },
+      "refill_time_3": {
+        "name": "Refill time 3"
+      },
+      "plant_summary": {
+        "name": "Plants"
+      },
+      "pump_sync": {
+        "name": "Pump sync"
+      },
+      "pump_state_reported": {
+        "name": "Pump state reported"
+      },
+      "pump_state_desired": {
+        "name": "Pump state desired"
+      },
+      "last_pumped_raw": {
+        "name": "Last watered raw"
+      },
+      "configured_plant": {
+        "name": "Local plant"
+      },
+      "last_watered_derived": {
+        "name": "Last watered derived"
+      },
+      "refill_time": {
+        "name": "Refill time"
+      },
+      "water_tank_percent": {
+        "name": "Water tank"
+      },
+      "water_tank_liters": {
+        "name": "Water level"
+      },
+      "battery_telemetry": {
+        "name": "Battery"
+      },
+      "energy_saving_mode": {
+        "name": "Power saving mode"
+      },
+      "water_distance": {
+        "name": "Water distance",
+        "state": {}
+      },
+      "water_liters_direct": {
+        "name": "Direct water level",
+        "state": {}
+      }
+    },
+    "switch": {
+      "pump": {
+        "name": "Pump"
+      }
+    },
+    "button": {
+      "refresh": {
+        "name": "Refresh"
+      },
+      "restart_device": {
+        "name": "Restart device"
+      },
+      "reset_last_pumped": {
+        "name": "Reset last pumped"
+      },
+      "reset_wifi_credentials": {
+        "name": "Reset Wi-Fi credentials"
+      }
+    }
+  }
+}
